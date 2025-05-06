@@ -50,29 +50,126 @@ d3.json("data/dark_graph_data.json").then(data => {
     node.y = yScale(node.world);
   });
 
-  // Create a force simulation
-  const simulation = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(50)) // Link force
-    .force("charge", d3.forceManyBody().strength(-50)) // Repulsion force
-    .force("x", d3.forceX(d => xScale(d.parsedDate)).strength(0.1)) // Pull nodes to their x positions
-    .force("y", d3.forceY(d => yScale(d.world)).strength(0.1)) // Pull nodes to their y positions
-    .on("tick", ticked); // Update positions on each tick
+  // Extract unique years and group nodes by year
+  const yearGroups = d3.groups(nodes, d => d.parsedDate.getFullYear());
 
-  // Draw edges (links)
+  // Set the gap (in pixels) between year boxes
+  const yearGap = 30;
+
+  // Calculate year box positions and widths with gaps
+  let prevX2 = null;
+  const yearBoxes = yearGroups.map(([year, nodesInYear], i, arr) => {
+    // Find min/max date for this year
+    const minDate = d3.min(nodesInYear, d => d.parsedDate);
+    const maxDate = d3.max(nodesInYear, d => d.parsedDate);
+
+    // x positions for min/max date in this year
+    let x1 = xScale(minDate);
+    let x2 = xScale(maxDate);
+
+    // If only one event, give a minimum width
+    if (x1 === x2) {
+      x1 -= 20;
+      x2 += 20;
+    }
+
+    // Optionally, expand the box a bit for visual clarity
+    x1 -= 10;
+    x2 += 10;
+
+    // Add gap from previous box
+    if (prevX2 !== null && x1 < prevX2 + yearGap) {
+      x1 = prevX2 + yearGap;
+      x2 = x1 + (x2 - x1);
+    }
+    prevX2 = x2;
+
+    return {
+      year,
+      x: x1,
+      width: x2 - x1
+    };
+  });
+
+  // Map worlds to y positions
+  const worldPositions = {};
+  worlds.forEach((w, i) => {
+    worldPositions[w] = yScale(w);
+  });
+
+  // Place nodes inside their year box, spaced horizontally by event order
+  yearBoxes.forEach(box => {
+    // Get nodes for this year, sort by date
+    const nodesInYear = nodes.filter(n => n.parsedDate.getFullYear() === box.year)
+      .sort((a, b) => a.parsedDate - b.parsedDate);
+
+    // Horizontal spacing within the box
+    const spacing = box.width / (nodesInYear.length + 1);
+
+    nodesInYear.forEach((node, i) => {
+      node.x = box.x + spacing * (i + 1);
+      node.y = worldPositions[node.world];
+    });
+  });
+
+  // Draw year boxes (behind everything)
+  g.selectAll(".year-box")
+    .data(yearBoxes)
+    .enter()
+    .append("rect")
+    .attr("class", "year-box")
+    .attr("x", d => d.x)
+    .attr("y", 0)
+    .attr("width", d => d.width)
+    .attr("height", innerHeight)
+    .attr("fill", "#444")
+    .attr("opacity", 0.15)
+    .lower();
+
+  // Optionally, add year labels at the top
+  g.selectAll(".year-label")
+    .data(yearBoxes)
+    .enter()
+    .append("text")
+    .attr("class", "year-label")
+    .attr("x", d => d.x + d.width / 2)
+    .attr("y", -10)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#bbb")
+    .attr("font-size", "16px")
+    .text(d => d.year);
+
+  // Draw links (straight lines between nodes)
   const link = g.selectAll(".link")
     .data(links)
     .enter().append("line")
     .attr("class", "link")
     .attr("stroke", "#999")
     .attr("stroke-opacity", 0.6)
-    .attr("stroke-width", 2);
+    .attr("stroke-width", 2)
+    .attr("x1", d => {
+      const source = nodes.find(n => n.id === d.source || n.id === d.source.id);
+      return source ? source.x : 0;
+    })
+    .attr("y1", d => {
+      const source = nodes.find(n => n.id === d.source || n.id === d.source.id);
+      return source ? source.y : 0;
+    })
+    .attr("x2", d => {
+      const target = nodes.find(n => n.id === d.target || n.id === d.target.id);
+      return target ? target.x : 0;
+    })
+    .attr("y2", d => {
+      const target = nodes.find(n => n.id === d.target || n.id === d.target.id);
+      return target ? target.y : 0;
+    });
 
   // Draw nodes
-const node = g.selectAll(".node")
+  const node = g.selectAll(".node")
     .data(nodes)
     .enter().append("g")
     .attr("class", "node")
-.call(drag(simulation)); // Enable dragging
+    .attr("transform", d => `translate(${d.x},${d.y})`);
 
   node.append("circle")
     .attr("r", d => d.death ? 8 : d.important ? 6 : 4)
@@ -88,42 +185,11 @@ const node = g.selectAll(".node")
     .attr("fill", "white")
     .text(d => d.id);
 
-  // Update positions on each simulation tick
-  function ticked() {
-    link
-      .attr("x1", d => d.source.x)
-      .attr("y1", d => d.source.y)
-      .attr("x2", d => d.target.x)
-      .attr("y2", d => d.target.y);
-
-    node
-      .attr("transform", d => `translate(${d.x},${d.y})`);
-  }
-
-  // Dragging behavior
-  function drag(simulation) {
-    return d3.drag()
-      .on("start", event => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      })
-      .on("drag", event => {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-      })
-      .on("end", event => {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-      });
-  }
-
   // Add axes
   g.append("g")
     .attr("transform", `translate(0, ${innerHeight})`)
     .call(d3.axisBottom(xScale));
 
-    g.append("g")
+  g.append("g")
     .call(d3.axisLeft(yScale));
 });
