@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Series Event Relationships</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #f1c40f;
+        }
+
+        svg {
+            display: block;
+            margin: 0 auto;
+            background-color: #2c3e50;
+        }
+
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+        }
+
+        .link {
+            stroke: #3498db;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+        }
+
+        .node text {
+            font-size: 10px;
+            fill: white;
+            pointer-events: none;
+            font-weight: bold;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            width: 120px;
+            height: 28px;
+            padding: 2px;
+            font-size: 12px;
+            background-color: black;
+            color: white;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dark Series Event Relationships</h1>
+    <svg width="1280" height="720"></svg>
+
+    <script>
+        // Fetching data from the JSON file
+        d3.json("/mnt/data/filtered_dark_graph_output.json").then(function(graphData) {
+            const svg = d3.select("svg");
+            const width = +svg.attr("width");
+            const height = +svg.attr("height");
+
+            const margin = { top: 50, right: 50, bottom: 50, left: 100 };
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom;
+
+            const parseDate = d3.timeParse("%d-%m-%Y");
+            const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+            const nodes = graphData.nodes.map(d => ({
+                ...d,
+                x: null,
+                y: null
+            }));
+
+            const links = graphData.links;
+
+            // Set up the scales
+            const xScale = d3.scaleTime()
+                .domain(d3.extent(nodes, d => d.parsedDate))
+                .range([0, innerWidth]);
+
+            const worlds = [...new Set(nodes.map(d => d.world))];
+            const yScale = d3.scalePoint()
+                .domain(worlds)
+                .range([0, innerHeight])
+                .padding(1);
+
+            const g = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            nodes.forEach(node => {
+                node.x = xScale(node.parsedDate);
+                node.y = yScale(node.world);
+            });
+
+            // Create a force simulation with increased repulsion and link distance
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(150)) // Increased distance between nodes
+                .force("charge", d3.forceManyBody().strength(-200)) // Increased repulsion to spread out nodes
+                .force("center", d3.forceCenter(innerWidth / 2, innerHeight / 2)) // Center the graph
+                .on("tick", ticked);
+
+            const link = g.selectAll(".link")
+                .data(links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke", "#3498db")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", 2);
+
+            const node = g.selectAll(".node")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .call(drag(simulation));
+
+            node.append("circle")
+                .attr("r", d => d.death ? 8 : d.important ? 6 : 4)
+                .attr("class", d => {
+                    if (d.important) return "Important";
+                    else if (d.death) return "Death";
+                    else return "Other";
+                });
+
+            node.append("text")
+                .attr("x", 10)
+                .attr("y", 3)
+                .attr("font-size", "10px")
+                .attr("fill", "white")
+                .text(d => d.id);
+
+            node.append("title")
+                .text(d => `${d.date} (${d.world})\n${d.description}`);
+
+            function ticked() {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+
+            function drag(simulation) {
+                return d3.drag()
+                    .on("start", event => {
+                        if (!event.active) simulation.alphaTarget(0.3).restart();
+                        event.subject.fx = event.subject.x;
+                        event.subject.fy = event.subject.y;
+                    })
+                    .on("drag", event => {
+                        event.subject.fx = event.x;
+                        event.subject.fy = event.y;
+                    })
+                    .on("end", event => {
+                        if (!event.active) simulation.alphaTarget(0);
+                        event.subject.fx = null;
+                        event.subject.fy = null;
+                    });
+            }
+
+            g.append("g")
+                .attr("transform", `translate(0, ${innerHeight})`)
+                .call(d3.axisBottom(xScale));
+
+            g.append("g")
+                .call(d3.axisLeft(yScale));
+
+        });
+    </script>
+
+</body>
+</html>

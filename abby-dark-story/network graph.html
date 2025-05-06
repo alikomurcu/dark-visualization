@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Network Visualization</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            text-align: center;
+        }
+
+        svg {
+            margin-top: 50px;
+        }
+
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: transform 0.3s ease, fill 0.3s ease;
+        }
+
+        .node:hover {
+            fill: #FF6347;
+            transform: scale(1.1);
+        }
+
+        .link {
+            fill: none;
+            stroke: #aaa;
+            stroke-width: 2px;
+        }
+
+        text {
+            font-size: 10px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .description-text {
+            font-size: 8px;
+            fill: black;
+            text-anchor: middle;
+        }
+
+        #info {
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            background-color: #e9f7e5;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #sort-options {
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        #sortBy {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background: green;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        #sortBy:hover {
+            background: red;
+            color: white;
+        }
+
+        .button-container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <svg width="1000" height="800"></svg>
+
+    <div id="info"></div>
+
+    <div id="sort-options">
+        <label>Sort by:</label>
+        <select id="sortBy">
+            <option value="year">Year</option>
+            <option value="character">Character</option>
+            <option value="event">Event</option>
+        </select>
+    </div>
+
+    <script>
+        var events = [
+            { id: 8, description: "... and activates it.", date: "21-06-1986", world: "Origin", characters: ["H.G. Tannhaus"] },
+            { id: 279, description: "Adam kills Martha to ensure that Teen Jonas will eventually turn into Adam.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen (J)"] },
+            { id: 135, description: "Adam reveals to teen Martha that the female stranger didn't send teen Jonas and her to stop the apocalypse. Instead they created the seed: the beginning of the knot, and also its end.", date: "24-09-2053", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen / Eve (M)"] },
+            { id: 28, description: "Adam saves Jonas from the apocalypse.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)"] },
+            { id: 465, description: "Adult Claudia decides to let old Egon die, thinking this is the sacrifice she needs to make to save Regina.", date: "26-06-1987", world: "Jonas", characters: ["Egon Tiedemann (J)", "Claudia Tiedemann (J)"] },
+            { id: 344, description: "Adult Magnus and adult Franziska face the god particle and await the end of the cycle.", date: "27-06-1921", world: "Jonas", characters: ["Magnus Nielsen (J)", "Franziska Doppler (J)"] },
+            { id: 391, description: "Adult Noah and adult Helge start kidnapping children in order to test the chair machine.", date: "21-06-1986", world: "Jonas", characters: ["Noah / Hanno Tauber (J)", "Helge Doppler (J)"] },
+            { id: 238, description: "Aleksander has the waste covered in concrete.", date: "21-06-2020", world: "Jonas", characters: ["Aleksander Tiedemann / Boris Niewald (J)"] },
+            { id: 388, description: "An explosion at the power plant causes the leak of radioactive material.", date: "21-06-1986", world: "Jonas", characters: [] },
+            { id: 35, description: "An explosion at the power plant causes the leak of radioactive material.", date: "23-06-1985", world: "Martha", characters: ["Unknown"] },
+            { id: 282, description: "At the last possible moment Jonas saves himself by jumping down the basement stairs in his house. Jonas will become Adam and Martha will become Eve.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)"] },
+            { id: 5, description: "He wants to create a time machine to undo it all.", date: "21-06-1976", world: "Origin", characters: ["H.G. Tannhaus"] }
+        ];
+
+        // Create the force simulation for the network graph
+        var width = 1000, height = 800;
+
+        var svg = d3.select("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var simulation = d3.forceSimulation(events)
+            .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(150))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Create weighted links based on the number of shared characters between events
+        var links = [];
+        for (let i = 0; i < events.length; i++) {
+            for (let j = i + 1; j < events.length; j++) {
+                let commonCharacters = events[i].characters.filter(character => events[j].characters.includes(character));
+                if (commonCharacters.length > 0) {
+                    links.push({ source: events[i].id, target: events[j].id, weight: commonCharacters.length });
+                }
+            }
+        }
+
+        // Create the links
+        var link = svg.append("g")
+            .selectAll(".link")
+            .data(links)
+            .enter().append("line")
+            .attr("class", "link")
+            .attr("stroke-width", function(d) { return d.weight; });
+
+        // Create the nodes
+        var node = svg.append("g")
+            .selectAll(".node")
+            .data(events)
+            .enter().append("circle")
+            .attr("class", "node")
+            .attr("r", 15)
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("click", function(event, d) {
+                // Display character names and the year
+                document.getElementById('info').innerHTML = `
+                    <strong>Event Date:</strong> ${d.date} <br>
+                    <strong>Character(s):</strong> ${d.characters.join(', ')}
+                `;
+            });
+
+        // Add descriptions inside nodes
+        node.append("text")
+            .attr("dy", -20)
+            .attr("text-anchor", "middle")
+            .text(function(d) { return d.description; });
+
+        simulation
+            .nodes(events)
+            .on("tick", ticked);
+
+        simulation
+            .force("link")
+            .links(links);
+
+        function ticked() {
+            link
+                .attr("x1", function(d) { return d.source.x; })
+                .attr("y1", function(d) { return d.source.y; })
+                .attr("x2", function(d) { return d.target.x; })
+                .attr("y2", function(d) { return d.target.y; });
+
+            node
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; });
+        }
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Sorting Functionality
+        d3.select("#sortBy").on("change", function() {
+            var selectedOption = this.value;
+
+            if (selectedOption === "year") {
+                events.sort(function(a, b) {
+                    return new Date(a.date) - new Date(b.date);  // Sort by Year
+                });
+            }
+
+            else if (selectedOption === "character") {
+                events.sort(function(a, b) {
+                    return a.characters.length - b.characters.length;  // Sort by Number of Characters
+                });
+            }
+
+            else if (selectedOption === "event") {
+                events.sort(function(a, b) {
+                    return a.description.localeCompare(b.description);  // Sort by Event Description Alphabetically
+                });
+            }
+
+            // Re-render the graph after sorting
+            simulation.nodes(events);
+            simulation.alpha(1).restart();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Network Visualization</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            text-align: center;
+        }
+
+        svg {
+            margin-top: 50px;
+        }
+
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: transform 0.3s ease, fill 0.3s ease;
+        }
+
+        .node:hover {
+            fill: #FF6347;
+            transform: scale(1.1);
+        }
+
+        .link {
+            fill: none;
+            stroke: #aaa;
+            stroke-width: 2px;
+        }
+
+        text {
+            font-size: 10px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .description-text {
+            font-size: 8px;
+            fill: black;
+            text-anchor: middle;
+        }
+
+        #info {
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            background-color: #e9f7e5;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #sort-options {
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        #sortBy {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background: green;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        #sortBy:hover {
+            background: red;
+            color: white;
+        }
+
+        .button-container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <svg width="1000" height="800"></svg>
+
+    <div id="info"></div>
+
+    <div id="sort-options">
+        <label>Sort by:</label>
+        <select id="sortBy">
+            <option value="year">Year</option>
+            <option value="character">Character</option>
+            <option value="event">Event</option>
+        </select>
+    </div>
+
+    <script>
+        var events = [
+            { id: 8, description: "... and activates it.", date: "21-06-1986", world: "Origin", characters: ["H.G. Tannhaus"] },
+            { id: 279, description: "Adam kills Martha to ensure that Teen Jonas will eventually turn into Adam.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen (J)"] },
+            { id: 135, description: "Adam reveals to teen Martha that the female stranger didn't send teen Jonas and her to stop the apocalypse. Instead they created the seed: the beginning of the knot, and also its end.", date: "24-09-2053", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen / Eve (M)"] },
+            { id: 28, description: "Adam saves Jonas from the apocalypse.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)"] },
+            { id: 465, description: "Adult Claudia decides to let old Egon die, thinking this is the sacrifice she needs to make to save Regina.", date: "26-06-1987", world: "Jonas", characters: ["Egon Tiedemann (J)", "Claudia Tiedemann (J)"] },
+            { id: 344, description: "Adult Magnus and adult Franziska face the god particle and await the end of the cycle.", date: "27-06-1921", world: "Jonas", characters: ["Magnus Nielsen (J)", "Franziska Doppler (J)"] },
+            { id: 391, description: "Adult Noah and adult Helge start kidnapping children in order to test the chair machine.", date: "21-06-1986", world: "Jonas", characters: ["Noah / Hanno Tauber (J)", "Helge Doppler (J)"] },
+            { id: 238, description: "Aleksander has the waste covered in concrete.", date: "21-06-2020", world: "Jonas", characters: ["Aleksander Tiedemann / Boris Niewald (J)"] },
+            { id: 388, description: "An explosion at the power plant causes the leak of radioactive material.", date: "21-06-1986", world: "Jonas", characters: [] },
+            { id: 35, description: "An explosion at the power plant causes the leak of radioactive material.", date: "23-06-1985", world: "Martha", characters: ["Unknown"] },
+            { id: 282, description: "At the last possible moment Jonas saves himself by jumping down the basement stairs in his house. Jonas will become Adam and Martha will become Eve.", date: "27-06-2020", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)"] },
+            { id: 5, description: "He wants to create a time machine to undo it all.", date: "21-06-1976", world: "Origin", characters: ["H.G. Tannhaus"] },
+            { id: 415, description: "Jona encounters his older self, who tells him no to interfere.", date: "09-11-1986", world: "Jonas", characters: ["Jonas Kahnwald / Adam (J)"] },
+            { id: 14, description: "Jonas and Martha hold hands as they watch each other disappear.", date: "08-11-1971", world: "Origin (End)", characters: ["Martha Nielsen / Eve (M)", "Jonas Kahnwald / Adam (J)"] },
+            { id: 11, description: "Jonas and Martha persuade Marek not to drive over the bridge where the fatal accident would have occurred.", date: "08-11-1971", world: "Origin (End)", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen / Eve (M)", "Marek Tannhaus", "Sonja Tannhaus", "Charlotte Tannhaus"] },
+            { id: 38, description: "Mads nielsen's body appears in the bunker, being witnessed by them.", date: "04-11-2019", world: "Martha", characters: ["Mads Nielsen (M)", "Martha Nielsen / Eve (M)", "Kilian Obendorf (M)", "Bartosz Tiedemann (M)", "Magnus Nielsen (M)", "Franziska Doppler (M)"] },
+            { id: 546, description: "Marek, Sonja and little Charlotte die in a car accident.", date: "01-01-1971", world: "Jonas", characters: ["Marek Tannhaus", "Sonja Tannhaus", "Charlotte Tannhaus"] },
+            { id: 283, description: "Martha arrives at the Kahnwald house and uses a new device to bring Jonas to safety to her universe. Adam will kill this Martha and Eve will kill this Jonas.", date: "27-06-2020", world: "Jonas", characters: ["Martha Nielsen / Eve (M)", "Jonas Kahnwald / Adam (J)"] },
+            { id: 281, description: "Martha arrives to Jonas' world.", date: "27-06-2020", world: "Jonas", characters: ["Martha Nielsen / Eve (M)"] },
+            { id: 179, description: "Michael kahnwald hangs himself.", date: "21-06-2019", world: "Jonas", characters: ["Mikkel Nielsen / Michael Kahnwald (J)"] },
+            { id: 183, description: "Mikkel nielsen goes missing.", date: "04-11-2019", world: "Jonas", characters: ["Mikkel Nielsen / Michael Kahnwald (J)"] },
+            { id: 320, description: "Noah shows Adam the leather notebook and Adam tells him that he can find out what happened to Charlotte in the missing pages.", date: "21-06-1920", world: "Jonas", characters: ["Noah / Hanno Tauber (J)", "Jonas Kahnwald / Adam (J)"] },
+            { id: 351, description: "Old claudia asks adult Tronte to kill adult Regina, so adult Claudia can move heaven and earth to prevent it.", date: "22-09-2020", world: "Jonas", characters: ["Claudia Tiedemann (J)", "Tronte Nielsen (J)"] },
+            { id: 491, description: "Plans to build the power plant begin.", date: "01-07-1953", world: "Jonas", characters: [] },
+            { id: 98, description: "Teen Martha from the future kills teen Jonas to ensure that Teen Martha will eventually turn into Eve.", date: "07-11-1920", world: "Martha", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen / Eve (M)"] },
+            { id: 75, description: "The apocalypse erupts in Winden.", date: "08-11-2019", world: "Martha", characters: [] },
+            { id: 345, description: "The apocalypse erupts in Winden.", date: "27-06-2020", world: "Jonas", characters: [] },
+            { id: 323, description: "The passage in the caves is being built by teen Noah and adult Bartosz.", date: "21-06-1921", world: "Jonas", characters: ["Noah / Hanno Tauber (J)", "Bartosz Tiedemann (J)"] },
+            { id: 439, description: "The time portal opens over Winden.", date: "12-11-1953", world: "Jonas", characters: [] },
+            { id: 436, description: "The time portal opens over Winden.", date: "12-11-1986", world: "Jonas", characters: [] },
+            { id: 440, description: "The time portal opens over Winden.", date: "12-11-2019", world: "Jonas", characters: [] },
+            { id: 441, description: "The time portal opens over Winden.", date: "12-11-2052", world: "Jonas", characters: [] },
+            { id: 534, description: "The unknown trio ambushed Winden's mayor and force him to sign the license to build the nuclear power plant.", date: "24-09-1954", world: "Jonas", characters: ["Unknown"] },
+            { id: 148, description: "There is a third world: the origin world.", date: "26-09-2053", world: "Jonas", characters: ["Claudia Tiedemann (J)", "Jonas Kahnwald / Adam (J)"] },
+            { id: 60, description: "They have sex and Martha gets pregnant with a son that will be the origin of everyone else in winden.", date: "06-11-2019", world: "Martha", characters: ["Jonas Kahnwald / Adam (J)", "Martha Nielsen / Eve (M)"] },
+            { id: 504, description: "Ulrich tries to kill little Helge so that he could prevent all the kids' murders.", date: "10-11-1953", world: "Jonas", characters: ["Ulrich Nielsen (J)", "Helge Doppler (J)"] },
+            { id: 170, description: "Wöller loses his eye.", date: "01-06-2019", world: "Jonas", characters: ["Torben Wöller (J)"] }
+        ];
+
+        // Create the force simulation for the network graph
+        var width = 1000, height = 800;
+
+        var svg = d3.select("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var simulation = d3.forceSimulation(events)
+            .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(150))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Create weighted links based on the number of shared characters between events
+        var links = [];
+        for (let i = 0; i < events.length; i++) {
+            for (let j = i + 1; j < events.length; j++) {
+                let commonCharacters = events[i].characters.filter(character => events[j].characters.includes(character));
+                if (commonCharacters.length > 0) {
+                    links.push({ source: events[i].id, target: events[j].id, weight: commonCharacters.length });
+                }
+            }
+        }
+
+        // Create the links
+        var link = svg.append("g")
+            .selectAll(".link")
+            .data(links)
+            .enter().append("line")
+            .attr("class", "link")
+            .attr("stroke-width", function(d) { return d.weight; });
+
+        // Create the nodes
+        var node = svg.append("g")
+            .selectAll(".node")
+            .data(events)
+            .enter().append("circle")
+            .attr("class", "node")
+            .attr("r", 15)
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("click", function(event, d) {
+                // Display event description on the graph
+                d3.select(this).append("text")
+                    .attr("class", "description-text")
+                    .attr("dy", -25)
+                    .attr("text-anchor", "middle")
+                    .text(function() { return d.description; });
+            });
+
+        // Add node labels (names)
+        node.append("text")
+            .attr("dy", -20)
+            .attr("text-anchor", "middle")
+            .text(function(d) { return d.characters.join(", "); });
+
+        // Update the graph on each tick
+        simulation
+            .nodes(events)
+            .on("tick", ticked);
+
+        simulation
+            .force("link")
+            .links(links);
+
+        function ticked() {
+            link
+                .attr("x1", function(d) { return d.source.x; })
+                .attr("y1", function(d) { return d.source.y; })
+                .attr("x2", function(d) { return d.target.x; })
+                .attr("y2", function(d) { return d.target.y; });
+
+            node
+                .attr("cx", function(d) { return d.x; })
+                .attr("cy", function(d) { return d.y; });
+        }
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Sorting Functionality
+        d3.select("#sortBy").on("change", function() {
+            var selectedOption = this.value;
+
+            if (selectedOption === "year") {
+                events.sort(function(a, b) {
+                    return new Date(a.date) - new Date(b.date);  // Sort by Year
+                });
+            }
+
+            else if (selectedOption === "character") {
+                events.sort(function(a, b) {
+                    return a.characters.length - b.characters.length;  // Sort by Number of Characters
+                });
+            }
+
+            else if (selectedOption === "event") {
+                events.sort(function(a, b) {
+                    return a.description.localeCompare(b.description);  // Sort by Event Description Alphabetically
+                });
+            }
+
+            // Re-render the graph after sorting
+            simulation.nodes(events);
+            simulation.alpha(1).restart();
+        });
+    </script>
+</body>
+</html>
