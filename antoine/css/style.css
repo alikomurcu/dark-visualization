@@ -1,0 +1,264 @@
+/* Dark Series Visualization Styles */
+
+:root {
+    --dark-bg: #121212;
+    --dark-secondary: #1e1e1e;
+    --text-primary: #f5f5f5;
+    --text-secondary: #aaaaaa;
+    --accent-color: #ffd700;
+    --jonas-color: #3498db;
+    --martha-color: #e74c3c;
+    --other-color: #2ecc71;
+    --important-color: #ffd700;
+    --death-color: #8e44ad;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--dark-bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 100%;
+    padding: 20px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+button {
+    background-color: var(--dark-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background-color: var(--accent-color);
+    color: var(--dark-bg);
+}
+
+.legend {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+}
+
+.legend-symbol {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+}
+
+.regular-event {
+    background-color: var(--text-primary);
+}
+
+.important-event {
+    background-color: var(--important-color);
+}
+
+.death-event {
+    background-color: var(--death-color);
+}
+
+.edge-line {
+    width: 15px;
+    height: 2px;
+    border-radius: 0;
+    background-color: var(--text-primary);
+}
+
+.summarized-edge {
+    width: 15px;
+    height: 2px;
+    border-radius: 0;
+    background-color: var(--text-primary);
+    border-top: 2px dashed var(--text-primary);
+}
+
+#visualization-container {
+    width: 100%;
+    height: calc(100vh - 100px);
+    overflow: hidden;
+    background-color: var(--dark-secondary);
+    border-radius: 4px;
+    position: relative;
+}
+
+#graph {
+    width: 100%;
+    height: 100%;
+}
+
+/* SVG Styling */
+.temporal-box {
+    fill: rgba(255, 255, 255, 0.05);
+    stroke: var(--text-secondary);
+    stroke-width: 1px;
+}
+
+.temporal-box-label {
+    fill: var(--text-primary);
+    font-size: 14px;
+    text-anchor: middle;
+}
+
+.swimlane {
+    fill: rgba(255, 255, 255, 0.02);
+    stroke: var(--text-secondary);
+    stroke-width: 0.5px;
+    stroke-dasharray: 2,2;
+}
+
+.swimlane-label {
+    fill: var(--text-secondary);
+    font-size: 12px;
+    text-anchor: start;
+}
+
+.node {
+    stroke: var(--dark-bg);
+    stroke-width: 1.5px;
+    cursor: pointer;
+}
+
+.node.jonas {
+    fill: var(--jonas-color);
+}
+
+.node.martha {
+    fill: var(--martha-color);
+}
+
+.node.other {
+    fill: var(--other-color);
+}
+
+.node.important {
+    fill: var(--important-color);
+}
+
+.node.death {
+    stroke: var(--death-color);
+    stroke-width: 2px;
+}
+
+.edge {
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 1px;
+    fill: none;
+}
+
+.edge-marker {
+    fill: rgba(255, 255, 255, 0.6);
+}
+
+.summarized-edge {
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 1px;
+    stroke-dasharray: 3,3;
+    fill: none;
+}
+
+.transition-path {
+    fill-opacity: 0.3;
+    stroke: none;
+}
+
+.transition-path.jonas {
+    fill: var(--jonas-color);
+}
+
+.transition-path.martha {
+    fill: var(--martha-color);
+}
+
+.transition-path.other {
+    fill: var(--other-color);
+}
+
+.transition-label {
+    fill: var(--text-primary);
+    font-size: 12px;
+    text-anchor: middle;
+}
+
+/* Start node styles - now applied to individual nodes */
+.node.start {
+    fill: var(--accent-color);
+    stroke: var(--text-primary);
+    stroke-width: 2px;
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    display: none;
+    background-color: var(--dark-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+    border-radius: 4px;
+    padding: 10px;
+    max-width: 300px;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-weight: bold;
+    border-bottom: 1px solid var(--text-secondary);
+    padding-bottom: 5px;
+}
+
+#tooltip-id {
+    color: var(--accent-color);
+}
+
+#tooltip-description {
+    margin-bottom: 8px;
+}
+
+#tooltip-characters, #tooltip-world {
+    font-size: 12px;
+    color: var(--text-secondary);
+}

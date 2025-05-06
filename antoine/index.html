@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Series - Temporal Graph Visualization</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- D3.js v7 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Dark Series - Temporal Graph Visualization</h1>
+            <div class="controls">
+                <button id="reset-zoom">Reset View</button>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-symbol regular-event"></div>
+                        <span>Regular Event</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-symbol important-event"></div>
+                        <span>Important Trigger Event</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-symbol death-event"></div>
+                        <span>Death Event</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-symbol edge-line"></div>
+                        <span>Direct Connection</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-symbol summarized-edge"></div>
+                        <span>Summarized Connection</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div id="visualization-container">
+            <svg id="graph"></svg>
+        </div>
+        <div id="tooltip" class="tooltip">
+            <div class="tooltip-header">
+                <span id="tooltip-id"></span>
+                <span id="tooltip-date"></span>
+            </div>
+            <div id="tooltip-description"></div>
+            <div id="tooltip-characters"></div>
+            <div id="tooltip-world"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/data_parser.js"></script>
+    <script src="js/layout_logic.js"></script>
+    <script src="js/visualisation.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
