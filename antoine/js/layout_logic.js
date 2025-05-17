@@ -331,81 +331,98 @@ const LayoutLogic = (() => {
      */
     const calculateNodePositions = data => {
         nodePositions = {};
-        const nodeRadii = {}; // Store final radius per node
+        const nodeRadii = {};
         const defaultRadius = NODE_RADIUS;
+        const iterations = 40;
+        const repulsionStrength = 1000;
+        const stepSize = 0.5;
     
-        // 1. Uniform layout
         swimlanes.forEach(swimlane => {
             const timeRange = swimlane.timeRange;
     
             swimlane.lanes.forEach(lane => {
                 const laneEvents = [...lane.events];
-                const nodeCount = laneEvents.length;
-                const laneWidth = lane.width;
-                const laneHeight = lane.height;
-                const padding = 20;
+                if (laneEvents.length === 0) return;
     
-                if (nodeCount === 0) return;
+                const laneX0 = lane.x + 10;
+                const laneY0 = lane.y + 10;
+                const laneX1 = lane.x + lane.width - 10;
+                const laneY1 = lane.y + lane.height - 10;
     
-                const maxCols = Math.floor((laneWidth - 2 * padding) / (2 * defaultRadius + 10));
-                const cols = Math.min(nodeCount, maxCols);
-                const rows = Math.ceil(nodeCount / cols);
-    
-                const xSpacing = (laneWidth - 2 * padding) / cols;
-                const ySpacing = (laneHeight - 2 * padding) / rows;
+                // Initial uniform positions (grid-like)
+                const cols = Math.ceil(Math.sqrt(laneEvents.length));
+                const rows = Math.ceil(laneEvents.length / cols);
+                const xSpacing = (laneX1 - laneX0) / cols;
+                const ySpacing = (laneY1 - laneY0) / rows;
     
                 laneEvents.forEach((event, index) => {
                     const col = index % cols;
                     const row = Math.floor(index / cols);
+                    const x = laneX0 + col * xSpacing + xSpacing / 2;
+                    const y = laneY0 + row * ySpacing + ySpacing / 2;
     
-                    const x = lane.x + padding + col * xSpacing + xSpacing / 2;
-                    const y = lane.y + padding + row * ySpacing + ySpacing / 2;
-    
-                    nodePositions[event.id] = {
-                        x,
-                        y,
-                        lane: lane.type,
-                        timeRange
-                    };
-    
+                    nodePositions[event.id] = { x, y, lane: lane.type, timeRange };
                     nodeRadii[event.id] = defaultRadius;
                 });
+    
+                // Force-based adjustment within box
+                for (let iter = 0; iter < iterations; iter++) {
+                    const forces = {};
+    
+                    // Initialize net force for each node
+                    laneEvents.forEach(a => {
+                        forces[a.id] = { x: 0, y: 0 };
+                    });
+    
+                    // Apply pairwise repulsion
+                    for (let i = 0; i < laneEvents.length; i++) {
+                        const a = laneEvents[i];
+                        const pa = nodePositions[a.id];
+    
+                        for (let j = i + 1; j < laneEvents.length; j++) {
+                            const b = laneEvents[j];
+                            const pb = nodePositions[b.id];
+    
+                            const dx = pa.x - pb.x;
+                            const dy = pa.y - pb.y;
+                            const distSq = dx * dx + dy * dy;
+                            const dist = Math.sqrt(distSq) || 0.01;
+    
+                            const force = repulsionStrength / distSq;
+    
+                            const fx = (dx / dist) * force;
+                            const fy = (dy / dist) * force;
+    
+                            forces[a.id].x += fx;
+                            forces[a.id].y += fy;
+                            forces[b.id].x -= fx;
+                            forces[b.id].y -= fy;
+                        }
+                    }
+    
+                    // Apply forces and clamp to box
+                    laneEvents.forEach(e => {
+                        const f = forces[e.id];
+                        const pos = nodePositions[e.id];
+    
+                        pos.x += f.x * stepSize;
+                        pos.y += f.y * stepSize;
+    
+                        // Clamp to lane box
+                        const r = nodeRadii[e.id];
+                        pos.x = Math.max(laneX0 + r, Math.min(laneX1 - r, pos.x));
+                        pos.y = Math.max(laneY0 + r, Math.min(laneY1 - r, pos.y));
+                    });
+                }
             });
         });
     
-        // 2. Post-process to prevent overlap
-        const eventIds = Object.keys(nodePositions);
-    
-        for (let i = 0; i < eventIds.length; i++) {
-            for (let j = i + 1; j < eventIds.length; j++) {
-                const id1 = eventIds[i];
-                const id2 = eventIds[j];
-    
-                const pos1 = nodePositions[id1];
-                const pos2 = nodePositions[id2];
-                const r1 = nodeRadii[id1];
-                const r2 = nodeRadii[id2];
-    
-                const dx = pos1.x - pos2.x;
-                const dy = pos1.y - pos2.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const minDistance = r1 + r2;
-    
-                if (distance < minDistance && distance > 0) {
-                    const newRadius = distance / 2;
-    
-                    // Apply the smaller radius to both
-                    nodeRadii[id1] = Math.min(nodeRadii[id1], newRadius);
-                    nodeRadii[id2] = Math.min(nodeRadii[id2], newRadius);
-                }
-            }
-        }
-    
-        // 3. Place start nodes (as before)
+        // Position start nodes (same logic as before)
         const startNodes = data.startNodes || [];
     
         startNodes.forEach((startNode, index) => {
             const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
+            const defaultRadius = NODE_RADIUS;
     
             if (outgoingEdges.length > 0) {
                 const targetEventIds = outgoingEdges.map(edge => edge.target);
