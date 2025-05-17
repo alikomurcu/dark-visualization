@@ -331,8 +331,10 @@ const LayoutLogic = (() => {
      */
     const calculateNodePositions = data => {
         nodePositions = {};
+        const nodeRadii = {}; // Store final radius per node
+        const defaultRadius = NODE_RADIUS;
     
-        // Uniform distribution within each swimlane & lane box
+        // 1. Uniform layout
         swimlanes.forEach(swimlane => {
             const timeRange = swimlane.timeRange;
     
@@ -341,12 +343,11 @@ const LayoutLogic = (() => {
                 const nodeCount = laneEvents.length;
                 const laneWidth = lane.width;
                 const laneHeight = lane.height;
-                const padding = 20; // Leave padding on edges of the box
+                const padding = 20;
     
                 if (nodeCount === 0) return;
     
-                // Grid layout: distribute evenly across available space
-                const maxCols = Math.floor((laneWidth - 2 * padding) / (2 * NODE_RADIUS + 10));
+                const maxCols = Math.floor((laneWidth - 2 * padding) / (2 * defaultRadius + 10));
                 const cols = Math.min(nodeCount, maxCols);
                 const rows = Math.ceil(nodeCount / cols);
     
@@ -366,11 +367,41 @@ const LayoutLogic = (() => {
                         lane: lane.type,
                         timeRange
                     };
+    
+                    nodeRadii[event.id] = defaultRadius;
                 });
             });
         });
     
-        // Start node positioning (keep logic as-is for now)
+        // 2. Post-process to prevent overlap
+        const eventIds = Object.keys(nodePositions);
+    
+        for (let i = 0; i < eventIds.length; i++) {
+            for (let j = i + 1; j < eventIds.length; j++) {
+                const id1 = eventIds[i];
+                const id2 = eventIds[j];
+    
+                const pos1 = nodePositions[id1];
+                const pos2 = nodePositions[id2];
+                const r1 = nodeRadii[id1];
+                const r2 = nodeRadii[id2];
+    
+                const dx = pos1.x - pos2.x;
+                const dy = pos1.y - pos2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = r1 + r2;
+    
+                if (distance < minDistance && distance > 0) {
+                    const newRadius = distance / 2;
+    
+                    // Apply the smaller radius to both
+                    nodeRadii[id1] = Math.min(nodeRadii[id1], newRadius);
+                    nodeRadii[id2] = Math.min(nodeRadii[id2], newRadius);
+                }
+            }
+        }
+    
+        // 3. Place start nodes (as before)
         const startNodes = data.startNodes || [];
     
         startNodes.forEach((startNode, index) => {
@@ -402,13 +433,14 @@ const LayoutLogic = (() => {
                                 lane: 'start',
                                 timeRange: null
                             };
+    
+                            nodeRadii[startNode.id] = defaultRadius;
                         }
                     }
                 }
             }
         });
     
-        // Fallback for start nodes without outgoing edges
         startNodes.forEach((node, i) => {
             if (!nodePositions[node.id] && temporalBoxes.length > 0) {
                 const firstBox = temporalBoxes[0];
@@ -418,9 +450,12 @@ const LayoutLogic = (() => {
                     lane: 'start',
                     timeRange: null
                 };
+    
+                nodeRadii[node.id] = defaultRadius;
             }
         });
     };
+    
     
     
     /**
