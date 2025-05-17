@@ -331,112 +331,71 @@ const LayoutLogic = (() => {
      */
     const calculateNodePositions = data => {
         nodePositions = {};
-        
-        // Position nodes within each swimlane with collision detection
+    
+        // Uniform distribution within each swimlane & lane box
         swimlanes.forEach(swimlane => {
             const timeRange = swimlane.timeRange;
-            
+    
             swimlane.lanes.forEach(lane => {
-                // Sort events by date
-                const sortedEvents = [...lane.events].sort((a, b) => a.date - b.date);
-                const placedNodes = []; // Keep track of already placed nodes for collision detection
-                
-                // Calculate horizontal position based on date within the time range
-                sortedEvents.forEach((event, i) => {
-                    const datePosition = (event.date - new Date(timeRange.start, 0, 1)) / 
-                                        (new Date(timeRange.end + 1, 0, 1) - new Date(timeRange.start, 0, 1));
-                    
-                    // Initial position
-                    const initialX = lane.x + 20 + (lane.width - 40) * Math.max(0, Math.min(1, datePosition));
-                    const initialY = lane.y + lane.height / 2;
-                    
-                    // Check for collisions and adjust position
-                    let finalX = initialX;
-                    let finalY = initialY;
-                    let collisionFound = true;
-                    let attempts = 0;
-                    const maxAttempts = 50;
-                    const nodeSize = event.importantTrigger ? NODE_RADIUS * 1.5 : NODE_RADIUS;
-                    
-                    while (collisionFound && attempts < maxAttempts) {
-                        collisionFound = false;
-                        
-                        // Check against all placed nodes
-                        for (const placedNode of placedNodes) {
-                            const dx = finalX - placedNode.x;
-                            const dy = finalY - placedNode.y;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-                            const minDistance = nodeSize + NODE_RADIUS + 2; // Minimum distance between nodes
-                            
-                            if (distance < minDistance) {
-                                collisionFound = true;
-                                
-                                // Try to adjust vertically first (within lane bounds)
-                                const verticalSpace = lane.height - 2 * nodeSize;
-                                const verticalOffset = (attempts % 2 === 0 ? 1 : -1) * Math.min(5, verticalSpace / 4);
-                                
-                                // Check if vertical adjustment would exceed lane bounds
-                                const newY = finalY + verticalOffset;
-                                if (newY >= lane.y + nodeSize && newY <= lane.y + lane.height - nodeSize) {
-                                    finalY = newY;
-                                } else {
-                                    // If vertical adjustment fails, try horizontal
-                                    const horizontalOffset = (attempts % 2 === 0 ? 1 : -1) * Math.min(5, lane.width / 20);
-                                    finalX = finalX + horizontalOffset;
-                                }
-                                break;
-                            }
-                        }
-                        
-                        attempts++;
-                    }
-                    
-                    // Store the final position
+                const laneEvents = [...lane.events];
+                const nodeCount = laneEvents.length;
+                const laneWidth = lane.width;
+                const laneHeight = lane.height;
+                const padding = 20; // Leave padding on edges of the box
+    
+                if (nodeCount === 0) return;
+    
+                // Grid layout: distribute evenly across available space
+                const maxCols = Math.floor((laneWidth - 2 * padding) / (2 * NODE_RADIUS + 10));
+                const cols = Math.min(nodeCount, maxCols);
+                const rows = Math.ceil(nodeCount / cols);
+    
+                const xSpacing = (laneWidth - 2 * padding) / cols;
+                const ySpacing = (laneHeight - 2 * padding) / rows;
+    
+                laneEvents.forEach((event, index) => {
+                    const col = index % cols;
+                    const row = Math.floor(index / cols);
+    
+                    const x = lane.x + padding + col * xSpacing + xSpacing / 2;
+                    const y = lane.y + padding + row * ySpacing + ySpacing / 2;
+    
                     nodePositions[event.id] = {
-                        x: finalX,
-                        y: finalY,
+                        x,
+                        y,
                         lane: lane.type,
                         timeRange
                     };
-                    
-                    // Add to placed nodes for future collision detection
-                    placedNodes.push(nodePositions[event.id]);
                 });
             });
         });
-        
-        // Reposition start nodes near their earliest target temporal box
+    
+        // Start node positioning (keep logic as-is for now)
         const startNodes = data.startNodes || [];
-        
+    
         startNodes.forEach((startNode, index) => {
-            // Find all outgoing edges from this start node
             const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
-            
+    
             if (outgoingEdges.length > 0) {
-                // Find the earliest target event
                 const targetEventIds = outgoingEdges.map(edge => edge.target);
                 const targetEvents = data.events.filter(event => targetEventIds.includes(event.id));
-                
+    
                 if (targetEvents.length > 0) {
-                    // Sort by date and get the earliest
                     const earliestTarget = [...targetEvents].sort((a, b) => a.date - b.date)[0];
                     const targetPosition = nodePositions[earliestTarget.id];
-                    
+    
                     if (targetPosition) {
-                        // Find the temporal box containing this target
-                        const targetBox = temporalBoxes.find(box => 
+                        const targetBox = temporalBoxes.find(box =>
                             box.start <= earliestTarget.year && box.end >= earliestTarget.year
                         );
-                        
+    
                         if (targetBox) {
-                            // Position start node just before the target box
-                            // Alternate above/below for multiple start nodes pointing to the same box
                             const isAbove = index % 2 === 0;
                             const xPos = targetBox.x - NODE_MARGIN;
-                            const yPos = isAbove ? 
-                                targetBox.y - NODE_MARGIN : 
-                                targetBox.y + targetBox.height + NODE_MARGIN;
-                            
+                            const yPos = isAbove
+                                ? targetBox.y - NODE_MARGIN
+                                : targetBox.y + targetBox.height + NODE_MARGIN;
+    
                             nodePositions[startNode.id] = {
                                 x: xPos,
                                 y: yPos,
@@ -448,9 +407,8 @@ const LayoutLogic = (() => {
                 }
             }
         });
-        
-        // For any start nodes that weren't assigned a position (no outgoing edges found)
-        // place them at the left edge of the first temporal box
+    
+        // Fallback for start nodes without outgoing edges
         startNodes.forEach((node, i) => {
             if (!nodePositions[node.id] && temporalBoxes.length > 0) {
                 const firstBox = temporalBoxes[0];
@@ -463,6 +421,7 @@ const LayoutLogic = (() => {
             }
         });
     };
+    
     
     /**
      * Generate path for a smooth transition between swimlanes
