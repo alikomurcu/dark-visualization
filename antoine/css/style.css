@@ -114,11 +114,29 @@ button:hover {
 
 #visualization-container {
     width: 100%;
-    height: calc(100vh - 100px);
-    overflow: hidden;
+    height: 80vh;
+    overflow: auto; /* Enable scrolling for large visualization */
     background-color: var(--dark-secondary);
     border-radius: 4px;
     position: relative;
+    /* Scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: var(--dark-secondary) var(--text-secondary);
+}
+
+/* For WebKit browsers (Chrome, Safari) */
+#visualization-container::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+#visualization-container::-webkit-scrollbar-track {
+    background: var(--dark-bg);
+}
+
+#visualization-container::-webkit-scrollbar-thumb {
+    background-color: var(--text-secondary);
+    border-radius: 6px;
 }
 
 #graph {
@@ -128,9 +146,11 @@ button:hover {
 
 /* SVG Styling */
 .temporal-box {
-    fill: rgba(255, 255, 255, 0.05);
+    fill: rgba(255, 255, 255, 0.08); /* Slightly brighter fill for visibility */
     stroke: var(--text-secondary);
-    stroke-width: 1px;
+    stroke-width: 2px; /* Thicker border to be more noticeable */
+    rx: 5px; /* Rounded corners */
+    ry: 5px;
 }
 
 .temporal-box-label {
@@ -180,20 +200,29 @@ button:hover {
 }
 
 .edge {
-    stroke: rgba(255, 255, 255, 0.6);
-    stroke-width: 1px;
+    stroke: rgba(255, 255, 255, 0.7);
+    stroke-width: 1.5px;
     fill: none;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.edge:hover {
+    opacity: 1;
+    stroke: rgba(255, 255, 255, 0.9);
+    stroke-width: 2px;
 }
 
 .edge-marker {
-    fill: rgba(255, 255, 255, 0.6);
+    fill: rgba(255, 255, 255, 0.8);
 }
 
 .summarized-edge {
     stroke: rgba(255, 255, 255, 0.6);
-    stroke-width: 1px;
-    stroke-dasharray: 3,3;
+    stroke-width: 1.5px;
+    stroke-dasharray: 4,3;
     fill: none;
+    opacity: 0.7;
 }
 
 .transition-path {

@@ -174,26 +174,173 @@ const Visualization = (() => {
     };
     
     /**
-     * Render edges between nodes
+     * Render edges between nodes with improved edge bundling
      */
     const renderEdges = () => {
         // Create group for edges
         const edgesGroup = zoomGroup.append('g')
             .attr('class', 'edges');
         
-        // Draw edges
+        // Group edges by similar paths to improve bundling
+        const edgeGroups = {};
+        
+        // Process edges and group them by source/target temporal boxes
         data.edges.forEach(edge => {
             const sourcePos = layout.nodePositions[edge.source];
             const targetPos = layout.nodePositions[edge.target];
             
-            if (sourcePos && targetPos) {
-                const isSummarized = DataParser.isSummarizedEdge(edge);
+            // Skip invalid edges
+            if (!sourcePos || !targetPos) return;
+            
+            // Create a key based on the temporal boxes to group similar edges
+            const sourceTimeRange = sourcePos.timeRange;
+            const targetTimeRange = targetPos.timeRange;
+            
+            // Create key for grouping similar edges
+            let key;
+            if (sourceTimeRange === targetTimeRange) {
+                // For edges within same time range, group by characters/lanes
+                key = `${sourceTimeRange}_${sourcePos.lane}_${targetPos.lane}`;
+            } else {
+                // For edges between time ranges, group by the time ranges themselves
+                key = `${sourceTimeRange}_${targetTimeRange}`;
+            }
+            
+            if (!edgeGroups[key]) {
+                edgeGroups[key] = [];
+            }
+            
+            edgeGroups[key].push({
+                edge,
+                source: sourcePos,
+                target: targetPos
+            });
+        });
+        
+        // Process edge groups
+        Object.values(edgeGroups).forEach(group => {
+            // Sort edges within the group for more consistent bundling
+            group.sort((a, b) => {
+                // Sort by vertical position to help with bundling
+                return (a.source.y + a.target.y) - (b.source.y + b.target.y);
+            });
+            
+            // Create paths for each edge in the group with bundling effect
+            group.forEach((edge, index) => {
+                const { source, target } = edge;
+                const isSummarized = DataParser.isSummarizedEdge(edge.edge);
                 
+                // Calculate path with bundling adjustments
+                let pathData;
+                
+                // Check if source and target are in the same temporal box
+                if (source.timeRange === target.timeRange) {
+                    // Use simple curved path for edges within same temporal box
+                    let curveHeight = 30; // Default curve height
+                    
+                    // Adjust curve height based on vertical distance
+                    const verticalDistance = Math.abs(target.y - source.y);
+                    if (verticalDistance < 40) {
+                        curveHeight = Math.max(15, verticalDistance * 0.5);
+                    }
+                    
+                    // For edges in same lane, use more curved paths
+                    if (source.lane === target.lane) {
+                        const midX = (source.x + target.x) / 2;
+                        const controlY = (source.y + target.y) / 2 - curveHeight;
+                        
+                        pathData = `M ${source.x} ${source.y} Q ${midX} ${controlY} ${target.x} ${target.y}`;
+                    } else {
+                        // For edges between different lanes in same temporal box
+                        // Use cubic curve for smoother path
+                        const dx = target.x - source.x;
+                        const dy = target.y - source.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Calculate control points
+                        const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
+                        const cp1x = source.x + dx * 0.25;
+                        const cp1y = source.y - distance * curveStrength;
+                        const cp2x = source.x + dx * 0.75;
+                        const cp2y = target.y - distance * curveStrength;
+                        
+                        pathData = `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
+                    }
+                } else {
+                    // For edges between different temporal boxes, create more pronounced bundled effect
+                    // Calculate fixed control points for consistent bundling
+                    const dx = target.x - source.x;
+                    
+                    // Use a fixed central channel for bundling
+                    // This creates a strong visual bundling effect
+                    const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === source.timeRange);
+                    const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === target.timeRange);
+                    
+                    // Find the temporal boxes, with safety checks
+                    const sourceBox = layout.temporalBoxes[sourceBoxIndex];
+                    const targetBox = layout.temporalBoxes[targetBoxIndex];
+                    
+                    // Check if the boxes exist
+                    let useSimpleCurve = false;
+                    if (!sourceBox || !targetBox) {
+                        useSimpleCurve = true;
+                    }
+                    
+                    if (useSimpleCurve) {
+                        // Use a simple curved path when boxes can't be found
+                        const midX = (source.x + target.x) / 2;
+                        const midY = (source.y + target.y) / 2;
+                        const controlOffset = Math.min(150, Math.abs(target.x - source.x) * 0.3);
+                        
+                        pathData = `M ${source.x} ${source.y} ` +
+                                   `Q ${midX} ${midY - controlOffset} ` +
+                                   `${target.x} ${target.y}`;
+                    } else {
+                        // For the large visualization, use much more pronounced bundling
+                        // Calculate the midpoint between the boxes (where the bundle should go through)
+                        const midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
+                        
+                        // Create a vertical "channel" where all edges between these boxes will pass through
+                        // For large visualization (12288x1200), we need more pronounced bundling
+                        const verticalChannelSize = 250; // Larger channel for more visual separation
+                        
+                        // Base position of the channel - place it above or below based on source/target positions
+                        const avgY = (source.y + target.y) / 2;
+                        const channelCenterY = avgY < height / 2 ? 
+                                               Math.max(100, avgY - verticalChannelSize) : 
+                                               Math.min(height - 100, avgY + verticalChannelSize);
+                        
+                        // Use group index to create multiple parallel channels if needed
+                        const groupSizeLimit = 10; // Maximum edges per channel
+                        const channelIndex = Math.floor(index / groupSizeLimit);
+                        const channelOffset = channelIndex * 40; // Offset for multiple channels
+                        
+                        // Calculate edge position within its channel
+                        const withinChannelIndex = index % groupSizeLimit;
+                        const edgeSeparation = 15; // More space between edges in large visualization
+                        const bundleOffset = (withinChannelIndex - (Math.min(group.length, groupSizeLimit) - 1) / 2) * edgeSeparation;
+                        
+                        // Final control point Y position
+                        const controlY = channelCenterY + channelOffset + bundleOffset;
+                        
+                        // Create a more exaggerated path for the large visualization 
+                        // with more space between control points
+                        pathData = `M ${source.x} ${source.y} ` +
+                                   `C ${source.x + dx * 0.15} ${source.y}, ` +
+                                   `${midX - 120} ${controlY}, ` +
+                                   `${midX} ${controlY} ` +
+                                   `S ${midX + 120} ${controlY}, ` +
+                                   `${target.x - dx * 0.15} ${target.y}, ` +
+                                   `${target.x} ${target.y}`;
+                    }
+                }
+                
+                // Create path element
                 edgesGroup.append('path')
                     .attr('class', isSummarized ? 'summarized-edge' : 'edge')
-                    .attr('d', LayoutLogic.generateEdgePath(sourcePos, targetPos, isSummarized))
+                    .attr('d', pathData)
                     .attr('marker-end', 'url(#arrow)');
-            }
+            });
         });
     };
     

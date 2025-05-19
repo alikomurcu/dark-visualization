@@ -5,14 +5,18 @@
 
 const LayoutLogic = (() => {
     // Constants for layout dimensions
-    const MARGIN = { top: 50, right: 50, bottom: 50, left: 150 };
-    const BOX_SPACING = 40;
-    const BOX_MIN_WIDTH = 150;
-    const BOX_MAX_WIDTH = 350;
+    const MARGIN = { top: 50, right: 80, bottom: 50, left: 150 };
+    const BOX_SPACING = 120; // Increased spacing between temporal boxes
+    const BOX_MIN_WIDTH = 200; // Wider minimum box width
+    const BOX_MAX_WIDTH = 500; // Wider maximum box width
     const MIN_SWIMLANE_HEIGHT = 60;
     const NODE_RADIUS = 6;
     const NODE_MARGIN = 30;
     const TRANSITION_CURVE_FACTOR = 0.5;
+    // Fixed dimensions for the graph (12288 x 1200 pixels)
+    const FIXED_WIDTH = 12288;
+    const FIXED_HEIGHT = 1200;
+    const ASPECT_RATIO = FIXED_WIDTH / FIXED_HEIGHT; // 10.24:1
     
     // Main characters for swimlanes
     const MAIN_CHARACTERS = [
@@ -35,10 +39,13 @@ const LayoutLogic = (() => {
      * @param {Object} svgElement - D3 selection of SVG element
      */
     const initialize = svgElement => {
+        // Log message to verify new code is loaded
+        console.log('DARK Visualization - New layout with fixed dimensions loaded');
+        
         svg = svgElement;
         updateDimensions();
         
-        // Set up zoom behavior
+        // Set up zoom behavior - using original parameters
         zoom = d3.zoom()
             .scaleExtent([0.1, 4])
             .on('zoom', event => {
@@ -71,15 +78,25 @@ const LayoutLogic = (() => {
     };
     
     /**
-     * Update dimensions based on container size
+     * Set the visualization to fixed dimensions (12288 x 1200 pixels)
      */
     const updateDimensions = () => {
         const container = d3.select('#visualization-container');
-        width = container.node().clientWidth;
-        height = container.node().clientHeight;
         
+        // Use our fixed dimensions
+        width = FIXED_WIDTH;
+        height = FIXED_HEIGHT;
+        
+        // Configure container for proper scrolling of the large visualization
+        container
+            .style('height', '80vh')
+            .style('overflow', 'auto');
+        
+        // Set SVG dimensions
         svg.attr('width', width)
            .attr('height', height);
+        
+        console.log(`DARK Visualization set to fixed dimensions: ${width} x ${height} pixels`);
     };
     
     /**
