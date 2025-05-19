@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dark Timeline – Fixed Horizontal</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    svg { width: 100vw; height: 100vh; }
+    .axis path,
+    .axis line { stroke: #333; }
+    .axis text { fill: #333; font-size: 12px; }
+    .link { stroke: #999; stroke-opacity: 0.6; }
+    .node { stroke: #fff; stroke-width: 1.5px; }
+  </style>
+</head>
+<body>
+  <svg></svg>
+  <script>
+    // — 1. Dummy data (swap in your own Jonas/Martha subset) —
+    const data = {
+      nodes: [
+        { id: "Jonas",         world: "World1", time: "2019-06-01" },
+        { id: "J_Event_A",     world: "World1", time: "2019-07-15" },
+        { id: "J_Event_B",     world: "World2", time: "2020-02-10" },
+        { id: "Martha",        world: "World2", time: "2019-06-05" },
+        { id: "M_Event_A",     world: "World2", time: "2019-08-01" },
+        { id: "M_Event_B",     world: "World1", time: "2020-03-20" },
+        // (other nodes filtered out)
+      ],
+      links: [
+        { source: "Jonas",      target: "J_Event_A" },
+        { source: "Jonas",      target: "J_Event_B" },
+        { source: "Martha",     target: "M_Event_A" },
+        { source: "Martha",     target: "M_Event_B" },
+        { source: "J_Event_B",  target: "M_Event_B" }
+      ]
+    };
+
+    // — 2. Prep SVG & dimensions —
+    const svg = d3.select("svg"),
+          width = +svg.attr("width") || window.innerWidth,
+          height = +svg.attr("height") || window.innerHeight,
+          margin = { top: 40, right: 30, bottom: 50, left: 80 };
+
+    // — 3. Parse dates & build helper map —
+    const parseDate = d3.timeParse("%Y-%m-%d");
+    data.nodes.forEach(d => d._date = parseDate(d.time));
+    const nodeById = new Map(data.nodes.map(d => [d.id, d]));
+
+    // — 4. Scales & Axes —
+    const worlds = Array.from(new Set(data.nodes.map(d => d.world)));
+    const x = d3.scaleTime()
+                .domain(d3.extent(data.nodes, d => d._date))
+                .range([margin.left, width - margin.right]);
+
+    const y = d3.scalePoint()
+                .domain(worlds)
+                .range([margin.top, height - margin.bottom])
+                .padding(0.5);
+
+    const color = d3.scaleOrdinal(d3.schemeCategory10).domain(worlds);
+
+    // draw axes
+    svg.append("g")
+       .attr("class","axis")
+       .attr("transform",`translate(0,${height - margin.bottom})`)
+       .call(d3.axisBottom(x).ticks(d3.timeMonth.every(2)).tickFormat(d3.timeFormat("%b ’%y")));
+
+    svg.append("g")
+       .attr("class","axis")
+       .attr("transform",`translate(${margin.left},0)`)
+       .call(d3.axisLeft(y));
+
+    // — 5. Draw links as straight lines — 
+    svg.selectAll(".link")
+       .data(data.links)
+       .enter()
+       .append("line")
+       .attr("class","link")
+       .attr("x1", d => x(nodeById.get(d.source)._date))
+       .attr("y1", d => y(nodeById.get(d.source).world))
+       .attr("x2", d => x(nodeById.get(d.target)._date))
+       .attr("y2", d => y(nodeById.get(d.target).world));
+
+    // — 6. Draw nodes at fixed (x,y) positions —
+    svg.selectAll(".node")
+       .data(data.nodes)
+       .enter()
+       .append("circle")
+       .attr("class","node")
+       .attr("r", 8)
+       .attr("cx", d => x(d._date))
+       .attr("cy", d => y(d.world))
+       .attr("fill", d => color(d.world))
+       .append("title")
+       .text(d => `${d.id} — ${d.world} — ${d.time}`);
+
+  </script>
+</body>
+</html>

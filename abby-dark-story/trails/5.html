@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dark Series Timeline and Event Graph</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    svg {
+      background: #1c1c1c;
+      margin-bottom: 20px;
+      border: 1px solid #444;
+    }
+    .node {
+      stroke: white;
+      stroke-width: 1px;
+      cursor: pointer;
+    }
+    .highlight {
+      stroke: white;
+      stroke-width: 2px;
+    }
+    .tooltip {
+      position: absolute;
+      background: #222;
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 13px;
+    }
+    #filters {
+      margin: 10px;
+    }
+    select {
+      padding: 6px;
+      margin: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Dark Series Timeline & Event Graph</h2>
+  <div id="filters">
+    <label for="characterFilter">Character Filter:</label>
+    <select id="characterFilter">
+      <option value="all">All Characters</option>
+      <option value="Jonas">Jonas</option>
+      <option value="Martha">Martha</option>
+      <option value="Noah">Noah</option>
+      <option value="Claudia">Claudia</option>
+      <option value="Ulrich">Ulrich</option>
+    </select>
+
+    <label for="eventTypeFilter">Event Type Filter:</label>
+    <select id="eventTypeFilter">
+      <option value="all">All Types</option>
+      <option value="trigger">Trigger</option>
+      <option value="death">Death</option>
+    </select>
+  </div>
+
+  <svg id="timeline" width="1000" height="220"></svg>
+  <div id="info"></div>
+
+  <svg id="graph" width="1000" height="600"></svg>
+
+  <div class="tooltip" style="opacity: 0;"></div>
+
+  <script>
+    const timelineSvg = d3.select("#timeline");
+    const graphSvg = d3.select("#graph");
+    const tooltip = d3.select(".tooltip");
+    const infoBox = d3.select("#info");
+
+    // Mock event data
+    const data = [
+      { id: 1, year: 1921, description: "Sic Mundus formed", characters: ["Jonas", "Noah"], type: "trigger", world: "Jonas", episode: "S2E6" },
+      { id: 2, year: 1954, description: "Helge abducted", characters: ["Helge", "Noah"], type: "death", world: "Jonas", episode: "S1E9" },
+      { id: 3, year: 1986, description: "Nuclear accident", characters: ["Claudia", "Bernd"], type: "trigger", world: "Martha", episode: "S2E1" },
+      { id: 4, year: 2019, description: "Mikkel disappears", characters: ["Mikkel", "Ulrich"], type: "trigger", world: "Origin", episode: "S1E1" },
+      { id: 5, year: 2053, description: "Martha activates device", characters: ["Martha"], type: "trigger", world: "Martha", episode: "S3E7" }
+    ];
+
+    // Mock graph data
+    const nodes = [
+      { id: 1, year: 1921, description: "Sic Mundus formed", type: "trigger", world: "Jonas", characters: ["Jonas", "Noah"], episode: "S2E6" },
+      { id: 2, year: 1954, description: "Helge abducted", type: "death", world: "Jonas", characters: ["Helge", "Noah"], episode: "S1E9" },
+      { id: 3, year: 1986, description: "Nuclear accident", type: "trigger", world: "Martha", characters: ["Claudia", "Bernd"], episode: "S2E1" },
+      { id: 4, year: 2019, description: "Mikkel disappears", type: "trigger", world: "Origin", characters: ["Mikkel", "Ulrich"], episode: "S1E1" },
+      { id: 5, year: 2053, description: "Martha activates device", type: "trigger", world: "Martha", characters: ["Martha"], episode: "S3E7" }
+    ];
+
+    const links = [
+      { source: 1, target: 2 },
+      { source: 2, target: 3 },
+      { source: 3, target: 4 },
+      { source: 4, target: 5 }
+    ];
+
+    const worldColor = {
+      "Jonas": "steelblue",
+      "Martha": "crimson",
+      "Origin": "darkorange"
+    };
+
+    // Scales for timeline
+    const x = d3.scaleLinear().domain([1888, 2053]).range([60, 940]);
+    const y = 100;
+
+    // Draw timeline axis
+    timelineSvg.append("g")
+      .attr("transform", `translate(0,${y + 40})`)
+      .call(d3.axisBottom(x).tickFormat(d3.format("d")).ticks(20))
+      .selectAll("text")
+      .style("fill", "white");
+
+    // Render timeline events
+    function renderTimeline(events) {
+      const join = timelineSvg.selectAll("circle")
+        .data(events, d => d.id);
+
+      join.enter()
+        .append("circle")
+        .attr("cx", d => x(d.year))
+        .attr("cy", y)
+        .attr("r", 8)
+        .attr("fill", d => worldColor[d.world])
+        .attr("class", "event-circle")
+        .on("mouseover", (event, d) => {
+          tooltip.transition().duration(200).style("opacity", 0.9);
+          tooltip.html(`<strong>${d.description}</strong><br/>
+                        Year: ${d.year}<br/>
+                        Type: ${d.type}<br/>
+                        World: ${d.world}`)
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY - 28}px`);
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0))
+        .on("click", (_, d) => {
+          infoBox.html(`
+            <h3>Event: ${d.description}</h3>
+            <p><strong>Year:</strong> ${d.year}</p>
+            <p><strong>Type:</strong> ${d.type}</p>
+            <p><strong>World:</strong> ${d.world}</p>
+            <p><strong>Characters:</strong> ${d.characters.join(", ")}</p>
+            <p><strong>Episode:</strong> ${d.episode}</p>
+          `);
+        });
+
+      join.exit().remove();
+    }
+
+    // Render graph (force-directed)
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(160))
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(500, 300));
+
+    const link = graphSvg.append("g")
+      .attr("stroke", "#aaa")
+      .selectAll("line")
+      .data(links)
+      .enter().append("line");
+
+    const node = graphSvg.append("g")
+      .selectAll("circle")
+      .data(nodes)
+      .enter().append("circle")
+      .attr("class", "node")
+      .attr("r", 18)
+      .attr("fill", d => worldColor[d.world])
+      .attr("stroke", d => d.type === "death" ? "yellow" : "white")
+      .attr("stroke-width", d => d.type === "death" ? 3 : 1.5)
+      .on("mouseover", (event, d) => {
+        tooltip.style("opacity", 1)
+          .html(`<strong>${d.description}</strong><br/>
+                 Year: ${d.year}<br/>
+                 Type: ${d.type}<br/>
+                 Characters: ${d.characters.join(", ")}<br/>
+                 Episode: ${d.episode}<br/>
+                 World: ${d.world}`)
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY - 28 + "px");
+      })
+      .on("mouseout", () => tooltip.style("opacity", 0))
+      .call(d3.drag()
+        .on("start", dragstart)
+        .on("drag", dragged)
+        .on("end", dragend));
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+    });
+
+    // Dragging functions for the graph
+    function dragstart(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragend(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    // Filter Functions
+    function updateView() {
+      const characterFilter = document.getElementById("characterFilter").value;
+      const eventTypeFilter = document.getElementById("eventTypeFilter").value;
+
+      // Filter data for timeline and graph
+      const filteredData = data.filter(d =>
+        (characterFilter === "all" || d.characters.includes(characterFilter)) &&
+        (eventTypeFilter === "all" || d.type === eventTypeFilter)
+      );
+
+      // Render filtered timeline and graph
+      renderTimeline(filteredData);
+    }
+
+    // Add event listeners for filters
+    document.getElementById("characterFilter").addEventListener("change", updateView);
+    document.getElementById("eventTypeFilter").addEventListener("change", updateView);
+
+    // Initial render
+    updateView();
+  </script>
+</body>
+</html>
