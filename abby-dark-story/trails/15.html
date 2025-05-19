@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dark Series: Advanced Sankey Timeline</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #111;
+      color: #fff;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    svg {
+      width: 100%;
+      height: 500px;
+    }
+    .timeline {
+      height: 500px;
+      width: 100%;
+    }
+    .sankey {
+      height: 500px;
+      width: 100%;
+    }
+    .node rect {
+      fill: #42A5F5;
+      stroke: #fff;
+      stroke-width: 1;
+    }
+    .link {
+      fill: none;
+      stroke: #aaa;
+      stroke-width: 2px;
+      opacity: 0.6;
+    }
+    .link:hover {
+      stroke: #ff9800;
+      opacity: 1;
+    }
+    .tooltip {
+      position: absolute;
+      background-color: #333;
+      padding: 8px;
+      border-radius: 4px;
+      color: #fff;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .highlight {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dark Series: Sankey Diagram + Interactive Timeline</h1>
+
+  <!-- Timeline Visualization -->
+  <svg class="timeline" id="timeline"></svg>
+
+  <!-- Sankey Diagram -->
+  <svg class="sankey" id="sankey"></svg>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    // Mocked dataset for events and causal loops
+    const events = [
+      { id: 1, character: "Jonas Kahnwald", year: 1986, world: "Jonas", age: 19 },
+      { id: 2, character: "Martha Nielsen", year: 1986, world: "Martha", age: 19 },
+      { id: 3, character: "Jonas Kahnwald", year: 2020, world: "Jonas", age: 53 },
+      { id: 4, character: "Martha Nielsen", year: 2020, world: "Martha", age: 53 },
+      { id: 5, character: "Claudia Tiedemann", year: 2019, world: "Jonas", age: 59 },
+      { id: 6, character: "Noah", year: 2019, world: "Jonas", age: 55 },
+      { id: 7, character: "Ulrich Nielsen", year: 2020, world: "Jonas", age: 57 },
+      { id: 8, character: "Martha Nielsen", year: 2020, world: "Martha", age: 53 },
+    ];
+
+    const causalLoops = [
+      { source: 1, target: 2 },
+      { source: 2, target: 1 },
+      { source: 3, target: 4 },
+      { source: 4, target: 3 }
+    ];
+
+    const svgTimeline = d3.select(".timeline");
+    const svgSankey = d3.select(".sankey");
+    const tooltip = d3.select("#tooltip");
+    const width = window.innerWidth;
+    const height = 500;
+
+    // Create the xScale for the timeline
+    const xScale = d3.scaleLinear()
+      .domain([1986, 2053])
+      .range([100, width - 100]);
+
+    // Create the yScale for the timeline (Jonas and Martha)
+    const yScale = d3.scaleBand()
+      .domain(["Jonas", "Martha"])
+      .range([100, height - 100])
+      .padding(0.1);
+
+    // Create the link function for Sankey Diagram (Curved Flow between Events)
+    const link = d3.link(d3.curveBumpY)
+      .x(d => xScale(d.year))
+      .y(d => yScale(d.world));
+
+    // Draw Events on Timeline (Jonas and Martha)
+    svgTimeline.selectAll("circle")
+      .data(events)
+      .join("circle")
+        .attr("cx", d => xScale(d.year))
+        .attr("cy", d => yScale(d.world))
+        .attr("r", 6)
+        .attr("fill", d => d.world === "Jonas" ? "#42A5F5" : "#EF5350")
+        .attr("class", "event")
+        .on("mouseover", (event, d) => showTooltip(event, d))
+        .on("mouseout", () => hideTooltip());
+
+    // Add labels for characters in the timeline
+    svgTimeline.selectAll(".label")
+      .data(events)
+      .join("text")
+        .attr("x", d => xScale(d.year))
+        .attr("y", d => yScale(d.world) - 10)
+        .attr("fill", "#fff")
+        .style("text-anchor", "middle")
+        .text(d => d.character);
+
+    // Function to show tooltip on hover
+    function showTooltip(event, d) {
+      tooltip.style("opacity", 1)
+        .style("left", `${event.pageX + 10}px`)
+        .style("top", `${event.pageY - 28}px`)
+        .html(`<strong>Character:</strong> ${d.character}<br><strong>Year:</strong> ${d.year}<br><strong>Age:</strong> ${d.age}`);
+    }
+
+    // Function to hide tooltip on mouseout
+    function hideTooltip() {
+      tooltip.style("opacity", 0);
+    }
+
+    // Prepare Data for Sankey Diagram (Flows between Events)
+    const sankeyData = {
+      nodes: [
+        { name: "Jonas Kahnwald" },
+        { name: "Martha Nielsen" },
+        { name: "Claudia Tiedemann" },
+        { name: "Noah" },
+        { name: "Ulrich Nielsen" }
+      ],
+      links: [
+        { source: 0, target: 1, value: 10 },
+        { source: 1, target: 0, value: 10 },
+        { source: 0, target: 2, value: 5 },
+        { source: 2, target: 1, value: 5 },
+        { source: 3, target: 4, value: 8 },
+        { source: 4, target: 3, value: 8 }
+      ]
+    };
+
+    // Create Sankey Diagram Layout
+    const sankey = d3.sankey()
+      .nodeWidth(15)
+      .nodePadding(10)
+      .size([width, height]);
+
+    // Define the Sankey diagram structure
+    const { nodes, links } = sankey(sankeyData);
+
+    // Draw Sankey Links (Flows)
+    svgSankey.selectAll(".link")
+      .data(links)
+      .join("path")
+        .attr("class", "link")
+        .attr("d", d3.sankeyLinkHorizontal())
+        .attr("stroke", "#fff")
+        .attr("stroke-width", d => d.width)
+        .attr("fill", "none")
+        .on("mouseover", (event, d) => {
+          d3.select(this).attr("stroke", "#ff9800").attr("opacity", 1);
+        })
+        .on("mouseout", function () {
+          d3.select(this).attr("stroke", "#fff").attr("opacity", 0.6);
+        })
+        .append("title")
+        .text(d => `${nodes[d.source].name} → ${nodes[d.target].name}: ${d.value}`);
+
+    // Draw Sankey Nodes (Events or Characters)
+    svgSankey.selectAll(".node")
+      .data(nodes)
+      .join("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${d.x0},${d.y0})`)
+      .append("rect")
+        .attr("height", d => d.y1 - d.y0)
+        .attr("width", sankey.nodeWidth())
+        .attr("fill", "#42A5F5")
+        .attr("stroke", "#fff")
+        .on("mouseover", (event, d) => {
+          d3.select(this).classed("highlight", true);
+        })
+        .on("mouseout", function () {
+          d3.select(this).classed("highlight", false);
+        })
+        .append("title")
+        .text(d => d.name);
+  </script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dark Event Graph</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    svg {
+      background: #1c1c1c;
+      border: 1px solid #444;
+    }
+    .node {
+      stroke: white;
+      stroke-width: 1px;
+      cursor: pointer;
+    }
+    .tooltip {
+      position: absolute;
+      background: #222;
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center;">Dark Series Event Graph</h2>
+  <svg width="1000" height="600"></svg>
+  <div class="tooltip" style="opacity:0;"></div>
+
+  <script>
+    const svg = d3.select("svg");
+    const tooltip = d3.select(".tooltip");
+
+    const nodes = [
+      { id: 1, year: 1921, description: "Sic Mundus formed", type: "trigger", world: "Jonas", characters: ["Jonas", "Noah"], episode: "S2E6" },
+      { id: 2, year: 1954, description: "Helge abducted", type: "death", world: "Jonas", characters: ["Helge", "Noah"], episode: "S1E9" },
+      { id: 3, year: 1986, description: "Nuclear accident", type: "trigger", world: "Martha", characters: ["Claudia", "Bernd"], episode: "S2E1" },
+      { id: 4, year: 2019, description: "Mikkel disappears", type: "trigger", world: "Origin", characters: ["Mikkel", "Ulrich"], episode: "S1E1" },
+      { id: 5, year: 2053, description: "Martha activates device", type: "trigger", world: "Martha", characters: ["Martha"], episode: "S3E7" }
+    ];
+
+    const links = [
+      { source: 1, target: 2 },
+      { source: 2, target: 3 },
+      { source: 3, target: 4 },
+      { source: 4, target: 5 }
+    ];
+
+    const color = {
+      "Jonas": "steelblue",
+      "Martha": "crimson",
+      "Origin": "darkorange"
+    };
+
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(160))
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(500, 300));
+
+    const link = svg.append("g")
+      .attr("stroke", "#aaa")
+      .selectAll("line")
+      .data(links)
+      .enter().append("line");
+
+    const node = svg.append("g")
+      .selectAll("circle")
+      .data(nodes)
+      .enter().append("circle")
+      .attr("class", "node")
+      .attr("r", 18)
+      .attr("fill", d => color[d.world])
+      .attr("stroke", d => d.type === "death" ? "yellow" : "white")
+      .attr("stroke-width", d => d.type === "death" ? 3 : 1.5)
+      .on("mouseover", (event, d) => {
+        tooltip.style("opacity", 1)
+          .html(`<strong>${d.description}</strong><br/>
+                 Year: ${d.year}<br/>
+                 Type: ${d.type}<br/>
+                 Characters: ${d.characters.join(", ")}<br/>
+                 Episode: ${d.episode}<br/>
+                 World: ${d.world}`)
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY - 28 + "px");
+      })
+      .on("mouseout", () => {
+        tooltip.style("opacity", 0);
+      })
+      .call(d3.drag()
+        .on("start", dragstart)
+        .on("drag", dragged)
+        .on("end", dragend));
+
+    function dragstart(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragend(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+    });
+  </script>
+</body>
+</html>

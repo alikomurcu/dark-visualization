@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dark Series - Parallel Coordinates</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background-color: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    svg {
+      width: 100%;
+      height: 600px;
+    }
+    .axis text {
+      fill: #ccc;
+    }
+    .axis path,
+    .axis line {
+      stroke: #666;
+    }
+    .line {
+      fill: none;
+      stroke-opacity: 0.4;
+      transition: stroke 0.2s, stroke-width 0.2s;
+    }
+    .line:hover {
+      stroke-opacity: 1;
+      stroke-width: 2;
+    }
+    .brush .selection {
+      fill: #4FC3F7;
+      fill-opacity: 0.2;
+      stroke: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dark Series - Parallel Coordinates (by World Mirror)</h1>
+  <svg id="chart"></svg>
+
+  <script>
+    const data = [
+      { Year: 1888, Events: 22, Jonas: 425, Martha: 107, Origin: 9, Important: 3, DeadCount: 2, World: "Jonas" },
+      { Year: 1890, Events: 5, Jonas: 425, Martha: 107, Origin: 9, Important: 1, DeadCount: 1, World: "Martha" },
+      { Year: 1920, Events: 17, Jonas: 425, Martha: 107, Origin: 9, Important: 2, DeadCount: 0, World: "Origin" },
+      { Year: 1986, Events: 62, Jonas: 425, Martha: 107, Origin: 9, Important: 8, DeadCount: 5, World: "Jonas" },
+      { Year: 2020, Events: 82, Jonas: 425, Martha: 107, Origin: 9, Important: 5, DeadCount: 3, World: "Martha" },
+      { Year: 2053, Events: 43, Jonas: 425, Martha: 107, Origin: 9, Important: 7, DeadCount: 6, World: "Origin" }
+    ];
+
+    const dimensions = ["Year", "Events", "Important", "DeadCount"];
+    const margin = { top: 50, right: 50, bottom: 20, left: 50 };
+    const width = window.innerWidth - margin.left - margin.right;
+    const height = 600;
+
+    const svg = d3.select("#chart")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height);
+
+    const x = d3.scalePoint()
+      .domain(dimensions)
+      .range([margin.left, width - margin.right]);
+
+    const y = {};
+    dimensions.forEach(dim => {
+      y[dim] = d3.scaleLinear()
+        .domain(d3.extent(data, d => d[dim]))
+        .range([height - margin.bottom, margin.top]);
+    });
+
+    const color = d3.scaleOrdinal()
+      .domain(["Jonas", "Martha", "Origin"])
+      .range(["#4FC3F7", "#EF5350", "#AB47BC"]);
+
+    const line = d3.line()
+      .defined(([dim, val]) => val != null)
+      .x(([dim, val]) => x(dim))
+      .y(([dim, val]) => y[dim](val));
+
+    const foreground = svg.append("g");
+
+    function drawLines(filtered = data) {
+      foreground.selectAll("path").remove();
+      foreground.selectAll("path")
+        .data(filtered)
+        .join("path")
+        .attr("class", "line")
+        .attr("stroke", d => color(d.World))
+        .attr("d", d => line(dimensions.map(dim => [dim, d[dim]])))
+        .append("title")
+        .text(d => `Year: ${d.Year}, World: ${d.World}, Deaths: ${d.DeadCount}`);
+    }
+
+    drawLines();
+
+    // Add axes + brushing
+    dimensions.forEach(dim => {
+      const g = svg.append("g")
+        .attr("transform", `translate(${x(dim)},0)`)
+        .attr("class", "axis")
+        .call(d3.axisLeft(y[dim]));
+
+      g.append("text")
+        .attr("y", margin.top - 15)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#4FC3F7")
+        .text(dim);
+
+      // Brush
+      g.append("g")
+        .attr("class", "brush")
+        .call(d3.brushY()
+          .extent([[ -10, margin.top ], [ 10, height - margin.bottom ]])
+          .on("brush end", brushed));
+
+      function brushed({ selection }) {
+        if (!selection) return drawLines();
+        const [y0, y1] = selection;
+        const filtered = data.filter(d => {
+          const v = y[dim](d[dim]);
+          return v >= y0 && v <= y1;
+        });
+        drawLines(filtered);
+      }
+    });
+  </script>
+</body>
+</html>

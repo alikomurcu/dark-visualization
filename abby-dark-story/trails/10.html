@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dark Series Timeline - Martha and Jonas</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    svg {
+      background: #1c1c1c;
+      margin-bottom: 20px;
+      border: 1px solid #444;
+    }
+    .node {
+      stroke: white;
+      stroke-width: 1px;
+      cursor: pointer;
+    }
+    .highlight {
+      stroke: white;
+      stroke-width: 2px;
+    }
+    .tooltip {
+      position: absolute;
+      background: #222;
+      color: white;
+      padding: 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 13px;
+    }
+    #filters {
+      margin: 10px;
+    }
+    select {
+      padding: 6px;
+      margin: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Dark Series Timeline: Martha and Jonas</h2>
+
+  <div id="filters">
+    <label for="eventTypeFilter">Event Type Filter:</label>
+    <select id="eventTypeFilter">
+      <option value="all">All Types</option>
+      <option value="trigger">Trigger</option>
+      <option value="death">Death</option>
+    </select>
+  </div>
+
+  <svg id="timeline" width="1000" height="1000"></svg>
+  <div id="info"></div>
+
+  <div class="tooltip" style="opacity: 0;"></div>
+
+  <script>
+    const timelineSvg = d3.select("#timeline");
+    const tooltip = d3.select(".tooltip");
+    const infoBox = d3.select("#info");
+
+    // Sample event data for Martha, Jonas, and others (filtered/compact data)
+    const data = [
+      { id: 1, year: 1921, description: "Sic Mundus formed", characters: ["Jonas", "Noah"], type: "trigger", world: "Jonas", episode: "S2E6", age: 33 },
+      { id: 2, year: 1954, description: "Helge abducted", characters: ["Helge", "Noah"], type: "death", world: "Jonas", episode: "S1E9", age: 20 },
+      { id: 3, year: 1986, description: "Nuclear accident", characters: ["Claudia", "Bernd"], type: "trigger", world: "Martha", episode: "S2E1", age: 40 },
+      { id: 4, year: 2019, description: "Mikkel disappears", characters: ["Mikkel", "Ulrich"], type: "trigger", world: "Origin", episode: "S1E1", age: 25 },
+      { id: 5, year: 2053, description: "Martha activates device", characters: ["Martha"], type: "trigger", world: "Martha", episode: "S3E7", age: 29 },
+      { id: 6, year: 1986, description: "Jonas goes to the future", characters: ["Jonas"], type: "trigger", world: "Martha", episode: "S2E9", age: 34 },
+      { id: 7, year: 2053, description: "Jonas attempts to stop the apocalypse", characters: ["Jonas"], type: "trigger", world: "Jonas", episode: "S3E8", age: 42 },
+      { id: 8, year: 1921, description: "Jonas finds the time portal", characters: ["Jonas", "Martha"], type: "trigger", world: "Jonas", episode: "S2E5", age: 40 }
+    ];
+
+    // Character color hues based on distinct characters
+    const characterColors = {
+      "Jonas": "steelblue",
+      "Martha": "crimson",
+      "Noah": "darkgreen",
+      "Helge": "orange",
+      "Claudia": "purple",
+      "Ulrich": "darkred",
+      "Mikkel": "gold",
+      "Bernd": "gray"
+    };
+
+    // Define radius and center
+    const radius = 400;
+    const centerX = 500;
+    const centerY = 500;
+
+    // Function to scale the year and show 33-year intervals
+    const x = d3.scaleLinear().domain([1888, 2053]).range([0, 2 * Math.PI]);
+
+    // Draw the axis
+    timelineSvg.append("g")
+      .attr("transform", `translate(${centerX}, ${centerY})`)
+      .call(d3.axisBottom(x).tickFormat(d3.format("d")).ticks(10));
+
+    // Render nodes: Compress data into clusters (33 years)
+    function renderTimeline(events) {
+      const join = timelineSvg.selectAll("circle")
+        .data(events, d => d.id);
+
+      join.enter()
+        .append("circle")
+        .attr("cx", d => centerX + radius * Math.cos(x(d.year)))
+        .attr("cy", d => centerY + radius * Math.sin(x(d.year)))
+        .attr("r", 8)
+        .attr("fill", d => characterColors[d.characters[0]]) // Assign color based on character
+        .attr("class", "node")
+        .style("fill-opacity", d => 1 - (d.age / 100)) // Shade by age
+        .on("mouseover", (event, d) => {
+          tooltip.transition().duration(200).style("opacity", 0.9);
+          tooltip.html(`<strong>${d.description}</strong><br/>
+                        Year: ${d.year}<br/>
+                        Type: ${d.type}<br/>
+                        World: ${d.world}`)
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY - 28}px`);
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0))
+        .on("click", (_, d) => {
+          infoBox.html(`
+            <h3>Event: ${d.description}</h3>
+            <p><strong>Year:</strong> ${d.year}</p>
+            <p><strong>Type:</strong> ${d.type}</p>
+            <p><strong>World:</strong> ${d.world}</p>
+            <p><strong>Characters:</strong> ${d.characters.join(", ")}</p>
+            <p><strong>Episode:</strong> ${d.episode}</p>
+          `);
+        });
+
+      join.exit().remove();
+    }
+
+    // Update function with filtering
+    function updateView() {
+      const eventTypeFilter = document.getElementById("eventTypeFilter").value;
+
+      // Filter the data based on the event type
+      const filteredData = data.filter(d => 
+        (eventTypeFilter === "all" || d.type === eventTypeFilter)
+      );
+
+      // Render the timeline
+      renderTimeline(filteredData);
+    }
+
+    // Add event listener for the filter
+    document.getElementById("eventTypeFilter").addEventListener("change", updateView);
+
+    // Initial render of filtered timeline
+    updateView();
+  </script>
+</body>
+</html>
