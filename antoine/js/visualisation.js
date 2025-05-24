@@ -232,7 +232,7 @@ const Visualization = (() => {
                 
                 // Calculate path with bundling adjustments
                 let pathData;
-                
+                let strokeColor = 'white';
                 // Check if source and target are in the same temporal box
                 if (source.timeRange === target.timeRange) {
                     // Use simple curved path for edges within same temporal box
@@ -250,6 +250,9 @@ const Visualization = (() => {
                         const controlY = (source.y + target.y) / 2 - curveHeight;
                         
                         pathData = `M ${source.x} ${source.y} Q ${midX} ${controlY} ${target.x} ${target.y}`;
+                        if (source.lane === 'jonas') strokeColor = 'blue';
+                        else if (source.lane === 'martha') strokeColor = 'green';
+                        else if (source.lane === 'other') strokeColor = 'yellow';
                     } else {
                         // For edges between different lanes in same temporal box
                         // Use cubic curve for smoother path
@@ -265,7 +268,12 @@ const Visualization = (() => {
                         const cp2y = target.y - distance * curveStrength;
                         
                         pathData = `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
+                        if (source.lane === 'jonas') strokeColor = 'blue';
+                        else if (source.lane === 'martha') strokeColor = 'green';
+                        else if (source.lane === 'other') strokeColor = 'yellow';
+                        
                     }
+                    strokeWidth = 1;
                 } else {
                     // For edges between different temporal boxes, create more pronounced bundled effect
                     // Calculate fixed control points for consistent bundling
@@ -333,13 +341,19 @@ const Visualization = (() => {
                                    `${target.x - dx * 0.15} ${target.y}, ` +
                                    `${target.x} ${target.y}`;
                     }
+
+                    strokeColor = 'white';
+                    strokeWidth = 2;
                 }
-                
+
+
                 // Create path element
                 edgesGroup.append('path')
                     .attr('class', isSummarized ? 'summarized-edge' : 'edge')
                     .attr('d', pathData)
-                    .attr('marker-end', 'url(#arrow)');
+                    .attr('marker-end', 'url(#arrow)')
+                    .style('stroke', strokeColor)
+                    .style('stroke-width', strokeWidth);
             });
         });
     };
