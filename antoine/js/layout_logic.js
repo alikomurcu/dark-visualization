@@ -342,139 +342,122 @@ const LayoutLogic = (() => {
         });
     };
     
+    const getTemporalBoxForEvent = event => {
+        return temporalBoxes.find(box =>
+            box.start <= event.year && box.end >= event.year
+        );
+    };
+    
+    const getSwimlaneForEvent = event => {
+        // Find the swimlane that includes this event
+        for (const swimlaneObj of swimlanes) {
+            for (const lane of swimlaneObj.lanes) {
+                if (lane.events.some(e => e.id === event.id)) {
+                    return lane;
+                }
+            }
+        }
+        return null;
+    };
+    
+
     /**
      * Calculate positions for all nodes
      * @param {Object} data - Object containing events, edges, and time ranges
      */
     const calculateNodePositions = data => {
         nodePositions = {};
-        const nodeRadii = {};
         const defaultRadius = NODE_RADIUS;
-        const iterations = 40;
-        const repulsionStrength = 1000;
-        const stepSize = 0.5;
     
-        swimlanes.forEach(swimlane => {
-            const timeRange = swimlane.timeRange;
+        // Create simulation nodes: clone events with swimlane & box info
+        const nodes = data.events.map(event => {
+            const swimlane = getSwimlaneForEvent(event);
+            const box = getTemporalBoxForEvent(event);
     
-            swimlane.lanes.forEach(lane => {
-                const laneEvents = [...lane.events];
-                if (laneEvents.length === 0) return;
-    
-                const laneX0 = lane.x + 10;
-                const laneY0 = lane.y + 10;
-                const laneX1 = lane.x + lane.width - 10;
-                const laneY1 = lane.y + lane.height - 10;
-    
-                // Initial uniform positions (grid-like)
-                const cols = Math.ceil(Math.sqrt(laneEvents.length));
-                const rows = Math.ceil(laneEvents.length / cols);
-                const xSpacing = (laneX1 - laneX0) / cols;
-                const ySpacing = (laneY1 - laneY0) / rows;
-    
-                laneEvents.forEach((event, index) => {
-                    const col = index % cols;
-                    const row = Math.floor(index / cols);
-                    const x = laneX0 + col * xSpacing + xSpacing / 2;
-                    const y = laneY0 + row * ySpacing + ySpacing / 2;
-    
-                    nodePositions[event.id] = { x, y, lane: lane.type, timeRange };
-                    nodeRadii[event.id] = defaultRadius;
-                });
-    
-                // Force-based adjustment within box
-                for (let iter = 0; iter < iterations; iter++) {
-                    const forces = {};
-    
-                    // Initialize net force for each node
-                    laneEvents.forEach(a => {
-                        forces[a.id] = { x: 0, y: 0 };
-                    });
-    
-                    // Apply pairwise repulsion
-                    for (let i = 0; i < laneEvents.length; i++) {
-                        const a = laneEvents[i];
-                        const pa = nodePositions[a.id];
-    
-                        for (let j = i + 1; j < laneEvents.length; j++) {
-                            const b = laneEvents[j];
-                            const pb = nodePositions[b.id];
-    
-                            const dx = pa.x - pb.x;
-                            const dy = pa.y - pb.y;
-                            const distSq = dx * dx + dy * dy;
-                            const dist = Math.sqrt(distSq) || 0.01;
-    
-                            const force = repulsionStrength / distSq;
-    
-                            const fx = (dx / dist) * force;
-                            const fy = (dy / dist) * force;
-    
-                            forces[a.id].x += fx;
-                            forces[a.id].y += fy;
-                            forces[b.id].x -= fx;
-                            forces[b.id].y -= fy;
-                        }
-                    }
-    
-                    // Apply forces and clamp to box
-                    laneEvents.forEach(e => {
-                        const f = forces[e.id];
-                        const pos = nodePositions[e.id];
-    
-                        pos.x += f.x * stepSize;
-                        pos.y += f.y * stepSize;
-    
-                        // Clamp to lane box
-                        const r = nodeRadii[e.id];
-                        pos.x = Math.max(laneX0 + r, Math.min(laneX1 - r, pos.x));
-                        pos.y = Math.max(laneY0 + r, Math.min(laneY1 - r, pos.y));
-                    });
-                }
-            });
+            return {
+                ...event,
+                swimlane,
+                box,
+                x: box.x + box.width / 2,
+                y: swimlane.y + swimlane.height / 2
+            };
         });
     
-        // Position start nodes (same logic as before)
-        const startNodes = data.startNodes || [];
+        // Create links from edges
+        const links = data.edges.map(edge => ({
+            source: edge.source,
+            target: edge.target
+        }));
     
+        // Create the simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(50).strength(0.1))
+            .force("charge", d3.forceManyBody().strength(-50))
+            .force("collision", d3.forceCollide(defaultRadius + 2))
+            .force("boxX", d3.forceX(d => d.box.x + d.box.width / 2).strength(0.05))
+            .force("swimlaneY", d3.forceY(d => d.swimlane.y + d.swimlane.height / 2).strength(0.1))
+            .stop();
+    
+        // Run the simulation for a set number of ticks
+        for (let i = 0; i < 300; i++) {
+            simulation.tick();
+        }
+    
+        // Clamp nodes back within their boxes
+        nodes.forEach(node => {
+            const r = defaultRadius;
+            const lane = node.swimlane;
+    
+            node.x = Math.max(lane.x + r, Math.min(lane.x + lane.width - r, node.x));
+            node.y = Math.max(lane.y + r, Math.min(lane.y + lane.height - r, node.y));
+    
+            nodePositions[node.id] = {
+                x: node.x,
+                y: node.y,
+                lane: lane.type,
+                timeRange: node.box
+            };
+        });
+
+        // ➡️ Keep original logic for start nodes
+        const startNodes = data.startNodes || [];
+
         startNodes.forEach((startNode, index) => {
             const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
-            const defaultRadius = NODE_RADIUS;
-    
+
             if (outgoingEdges.length > 0) {
                 const targetEventIds = outgoingEdges.map(edge => edge.target);
                 const targetEvents = data.events.filter(event => targetEventIds.includes(event.id));
-    
+
                 if (targetEvents.length > 0) {
                     const earliestTarget = [...targetEvents].sort((a, b) => a.date - b.date)[0];
                     const targetPosition = nodePositions[earliestTarget.id];
-    
+
                     if (targetPosition) {
                         const targetBox = temporalBoxes.find(box =>
                             box.start <= earliestTarget.year && box.end >= earliestTarget.year
                         );
-    
+
                         if (targetBox) {
                             const isAbove = index % 2 === 0;
                             const xPos = targetBox.x - NODE_MARGIN;
                             const yPos = isAbove
                                 ? targetBox.y - NODE_MARGIN
                                 : targetBox.y + targetBox.height + NODE_MARGIN;
-    
+
                             nodePositions[startNode.id] = {
                                 x: xPos,
                                 y: yPos,
                                 lane: 'start',
                                 timeRange: null
                             };
-    
-                            nodeRadii[startNode.id] = defaultRadius;
                         }
                     }
                 }
             }
         });
-    
+
+        // ➡️ Fallback for start nodes without linked targets
         startNodes.forEach((node, i) => {
             if (!nodePositions[node.id] && temporalBoxes.length > 0) {
                 const firstBox = temporalBoxes[0];
@@ -484,11 +467,10 @@ const LayoutLogic = (() => {
                     lane: 'start',
                     timeRange: null
                 };
-    
-                nodeRadii[node.id] = defaultRadius;
             }
         });
     };
+    
     
     
     
