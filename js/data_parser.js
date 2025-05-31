@@ -39,7 +39,7 @@ const DataParser = (() => {
                 isRomantic: isRomantic(event.Description) || isRomantic(event.Characters),
                 isMissing: isMissingPerson(event.Description) || isMissingPerson(event.Characters),
                 isTimeTravel: isTimeTravelEvent(event.Description) || isTimeTravelEvent(event.Characters)
-            })).filter(event => event.isRomantic || event.isMissing || event.isTimeTravel);
+            })).filter(event => event.importantTrigger || event.death || event.isRomantic || event.isMissing || event.isTimeTravel);
 
             console.log("Number of events:", events.length);
             // Get set of important event IDs for edge filtering

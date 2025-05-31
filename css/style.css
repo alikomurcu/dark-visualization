@@ -83,6 +83,7 @@ button:hover {
     width: 15px;
     height: 15px;
     border-radius: 50%;
+    background-color: var(--text-primary);
 }
 
 .regular-event {
@@ -95,6 +96,22 @@ button:hover {
 
 .death-event {
     background-color: var(--death-color);
+    clip-path: polygon(0 0, 0 40%, 40% 40%, 40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%);
+}
+
+.romantic-event {
+    background-color: var(--text-primary);
+    clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+.missing-event {
+    background-color: var(--text-primary);
+    border-radius: 0;
+}
+
+.timetravel-event {
+    background-color: var(--text-primary);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
 .edge-line {
