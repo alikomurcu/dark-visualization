@@ -210,10 +210,16 @@ const Visualization = (() => {
                 edgeGroups[key] = [];
             }
             
+            // Find the actual event data
+            const sourceEvent = data.events.find(e => e.id === edge.source);
+            const targetEvent = data.events.find(e => e.id === edge.target);
+            
             edgeGroups[key].push({
                 edge,
                 source: sourcePos,
-                target: targetPos
+                target: targetPos,
+                sourceEvent,
+                targetEvent
             });
         });
         
@@ -227,7 +233,7 @@ const Visualization = (() => {
             
             // Create paths for each edge in the group with bundling effect
             group.forEach((edge, index) => {
-                const { source, target } = edge;
+                const { source, target, sourceEvent, targetEvent } = edge;
                 const isSummarized = DataParser.isSummarizedEdge(edge.edge);
                 
                 // Calculate path with bundling adjustments
@@ -343,9 +349,9 @@ const Visualization = (() => {
                     }
 
                     strokeColor = 'white';
+                    if (sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel) strokeColor = 'red';
                     strokeWidth = 2;
                 }
-
 
                 // Create path element
                 edgesGroup.append('path')
@@ -370,12 +376,15 @@ const Visualization = (() => {
         nodesGroup.selectAll('.node')
             .data(data.events)
             .enter()
-            .append('circle')
+            .append('path')
             .attr('class', d => {
                 const primaryChar = DataParser.getPrimaryCharacter(d);
                 let classes = `node ${primaryChar}`;
                 if (d.importantTrigger) classes += ' important';
                 if (d.death) classes += ' death';
+                if (d.isRomantic) classes += ' romantic';
+                if (d.isMissing) classes += ' missing';
+                if (d.isTimeTravel) classes += ' time-travel';
                 
                 // Add start node class for nodes with no incoming edges
                 const position = layout.nodePositions[d.id];
@@ -385,14 +394,47 @@ const Visualization = (() => {
                 
                 return classes;
             })
-            .attr('r', d => {
-                // Make start nodes and important nodes slightly larger
-                const position = layout.nodePositions[d.id];
-                if (position && position.lane === 'start') return 8;
-                return d.importantTrigger ? 8 : 6;
+            .attr('d', d => {
+                const size = 10;
+                
+                // Define shapes based on event properties
+                if (d.isRomantic) {
+                    // Triangle pointing up
+                    return `M 0 -${size} L -${size} ${size} L ${size} ${size} Z`;
+                } else if (d.isMissing) {
+                    // Square
+                    return `M -${size} -${size} L ${size} -${size} L ${size} ${size} L -${size} ${size} Z`;
+                } else if (d.isTimeTravel) {
+                    // Star shape
+                    const points = 5;
+                    const outerRadius = size;
+                    const innerRadius = size * 0.4;
+                    let path = '';
+                    for (let i = 0; i < points * 2; i++) {
+                        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                        const angle = (i * Math.PI) / points;
+                        const x = radius * Math.sin(angle);
+                        const y = -radius * Math.cos(angle);
+                        path += (i === 0 ? 'M' : 'L') + ` ${x} ${y}`;
+                    }
+                    return path + 'Z';
+                } else if (d.death) {
+                    // Cross shape
+                    const crossSize = size * 1.5;
+                    return `M -${crossSize} -${crossSize} L ${crossSize} ${crossSize} M -${crossSize} ${crossSize} L ${crossSize} -${crossSize}`;
+                } else if (d.importantTrigger) {
+                    const tgSize = size * 1.5;
+                    return `M 0 0 m -${tgSize}, 0 a ${tgSize},${tgSize} 0 1,0 ${tgSize * 2},0 a ${tgSize},${tgSize} 0 1,0 -${tgSize * 2},0`;
+                }
+                else {
+                    // Circle (default shape)
+                    return `M 0 0 m -${size}, 0 a ${size},${size} 0 1,0 ${size * 2},0 a ${size},${size} 0 1,0 -${size * 2},0`;
+                }
             })
-            .attr('cx', d => layout.nodePositions[d.id]?.x || 0)
-            .attr('cy', d => layout.nodePositions[d.id]?.y || 0)
+            .attr('transform', d => {
+                const position = layout.nodePositions[d.id];
+                return `translate(${position.x}, ${position.y})`;
+            })
             .on('mouseover', showTooltip)
             .on('mouseout', hideTooltip);
     };
