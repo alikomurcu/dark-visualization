@@ -32,20 +32,33 @@ const DataParser = (() => {
                 description: event.Description,
                 date: parseDate(event.Date),
                 year: parseDate(event.Date).getFullYear(),
-                importantTrigger: event.Important_Trigger === 'TRUE',
-                death: event.Death === 'TRUE',
+                importantTrigger: event['Important Trigger'] === 'TRUE',
+                death: event['Death'] === 'TRUE',
                 characters: event.Characters ? event.Characters.split(',').map(c => c.trim()) : [],
-                world: event.World
-            }));
-            
-            // Process edges data
-            edges = edgesData.filter(edge => edge.Source && edge.Target).map(edge => ({
-                id: +edge.ID,
-                source: +edge.Source,
-                target: +edge.Target,
-                type: edge.Type,
-                description: edge.Description
-            }));
+                world: event.World,
+                isRomantic: isRomantic(event.Description) || isRomantic(event.Characters),
+                isMissing: isMissingPerson(event.Description) || isMissingPerson(event.Characters),
+                isTimeTravel: isTimeTravelEvent(event.Description) || isTimeTravelEvent(event.Characters)
+            })).filter(event => event.isRomantic || event.isMissing || event.isTimeTravel);
+
+            console.log("Number of events:", events.length);
+            // Get set of important event IDs for edge filtering
+            const eventIds = new Set(events.map(event => event.id));
+
+            // Process edges data - only keep edges between important events
+            edges = edgesData
+                .filter(edge => edge.Source && edge.Target)
+                .map(edge => ({
+                    id: +edge.ID,
+                    source: +edge.Source,
+                    target: +edge.Target,
+                    type: edge.Type,
+                    description: edge.Description
+                }))
+                .filter(edge => 
+                    eventIds.has(edge.source) && 
+                    eventIds.has(edge.target)
+                );
             
             // Identify start nodes (nodes with no incoming edges)
             const targetNodeIds = new Set(edges.map(edge => edge.target));
@@ -241,7 +254,43 @@ const DataParser = (() => {
         
         return intermediateEdges.length > 0;
     };
+
+    const romanticKeywords = [
+        "love", "marry", "marriage", "affair", "romantic", "husband", "wife", 
+        "boyfriend", "girlfriend", "relationship", "lover", "engage", "fiancé", "fiancée"
+    ];
+
+    // Helper function to check for romantic keywords
+    const isRomantic = text => {
+        if (!text) return false;
+        const lower = text.toLowerCase();
+        return romanticKeywords.some(keyword => lower.includes(keyword));
+    };
+
+    const missingKeywords = [
+        "missing", "disappear", "abducted", "gone", "lost", "vanished", "kidnapped"
+    ];
+
+    const isMissingPerson = text => {
+        if (!text) return false;
+        const lower = text.toLowerCase();
+        return missingKeywords.some(keyword => lower.includes(keyword));
+    };
+
+    const timeTravelKeywords = [
+        "travels", "travel to",
+        "wormhole", "time portal", "sends", "arrive", "use the"
     
+    ];
+
+    const isTimeTravelEvent = text => {
+        if (!text) return false;
+        const lower = text.toLowerCase();
+        return timeTravelKeywords.some(keyword => lower.includes(keyword));
+    };
+    
+    
+
     // Public API
     return {
         loadData,
