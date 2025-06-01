@@ -583,24 +583,32 @@ const savePng = () => {
 
     const svgData = new XMLSerializer().serializeToString(clonedSvg);
     
+    // Create canvas with the correct dimensions
     const canvas = document.createElement('canvas');
     canvas.width = 12288;
     canvas.height = 1200;
     const ctx = canvas.getContext('2d');
 
-    // Create the canvg instance and render it synchronously
-    const v = canvg.Canvg.fromString(ctx, svgData);
-    v.start(); // 🔧 no .then()
+    // Set background
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // After rendering, get the PNG data
-    const pngUrl = canvas.toDataURL('image/png');
+    // Create an image from the SVG
+    const img = new Image();
+    img.onload = () => {
+        // Draw the image on canvas
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    // Create a download link and trigger it
-    const downloadLink = document.createElement('a');
-    downloadLink.href = pngUrl;
-    downloadLink.download = 'dark-visualization.png';
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
+        // Convert to PNG and download
+        canvas.toBlob((blob) => {
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = 'dark-visualization.png';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }, 'image/png', 1.0);
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
 };
 
