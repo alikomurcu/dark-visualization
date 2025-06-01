@@ -17,6 +17,10 @@
             <h1>Dark Series - Temporal Graph Visualization</h1>
             <div class="controls">
                 <button id="reset-zoom">Reset View</button>
+                <div class="download-buttons">
+                    <button onclick="saveSvg()">Download SVG</button>
+                    <button onclick="savePng()">Download PNG</button>
+                </div>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-symbol regular-event"></div>
@@ -72,5 +76,6 @@
     <script src="js/layout_logic.js?v=20250519"></script>
     <script src="js/visualisation.js?v=20250519"></script>
     <script src="js/main.js?v=20250519"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/canvg/3.0.7/umd.min.js"></script>
 </body>
 </html>

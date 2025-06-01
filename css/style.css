@@ -51,6 +51,27 @@ h1 {
     flex-wrap: wrap;
 }
 
+.download-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.download-buttons button {
+    background-color: var(--dark-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    font-size: 12px;
+}
+
+.download-buttons button:hover {
+    background-color: var(--accent-color);
+    color: var(--dark-bg);
+}
+
 button {
     background-color: var(--dark-secondary);
     color: var(--text-primary);

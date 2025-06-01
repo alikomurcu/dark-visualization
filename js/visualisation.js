@@ -487,3 +487,120 @@ const Visualization = (() => {
         initialize
     };
 })();
+
+// Global functions for download buttons
+const saveSvg = () => {
+    const svgElement = document.querySelector('#graph');
+    const clonedSvg = svgElement.cloneNode(true);
+    
+    // Set proper dimensions and viewBox
+    clonedSvg.setAttribute('width', '12288');
+    clonedSvg.setAttribute('height', '1200');
+    clonedSvg.setAttribute('viewBox', '0 0 12288 1200');
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    // Add background rect
+    const backgroundRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    backgroundRect.setAttribute('width', '100%');
+    backgroundRect.setAttribute('height', '100%');
+    backgroundRect.setAttribute('fill', '#121212');
+    clonedSvg.insertBefore(backgroundRect, clonedSvg.firstChild);
+
+    // Include all styles
+    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleElement.textContent = `
+        .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #aaaaaa; stroke-width: 2px; }
+        .temporal-box-label { fill: #f5f5f5; font-size: 14px; text-anchor: middle; }
+        .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #aaaaaa; stroke-width: 0.5px; stroke-dasharray: 2,2; }
+        .swimlane-label { fill: #aaaaaa; font-size: 12px; text-anchor: start; }
+        .node { stroke: #121212; stroke-width: 1.5px; }
+        .node.jonas { fill: #3498db; }
+        .node.martha { fill: #e74c3c; }
+        .node.other { fill: #2ecc71; }
+        .node.important { fill: #ffd700; }
+        .node.death { stroke: #8e44ad; stroke-width: 2px; }
+        .edge { stroke: rgba(255, 255, 255, 0.7); stroke-width: 1.5px; fill: none; opacity: 0.8; }
+        .summarized-edge { stroke: rgba(255, 255, 255, 0.6); stroke-width: 1.5px; stroke-dasharray: 4,3; fill: none; opacity: 0.7; }
+        .transition-path { fill-opacity: 0.3; stroke: none; }
+        .transition-path.jonas { fill: #3498db; }
+        .transition-path.martha { fill: #e74c3c; }
+        .transition-path.other { fill: #2ecc71; }
+    `;
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = 'dark-visualization.svg';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    URL.revokeObjectURL(url);
+};
+
+const savePng = () => {
+    const svgElement = document.querySelector('#graph');
+    const clonedSvg = svgElement.cloneNode(true);
+    
+    // Set proper dimensions and viewBox
+    clonedSvg.setAttribute('width', '12288');
+    clonedSvg.setAttribute('height', '1200');
+    clonedSvg.setAttribute('viewBox', '0 0 12288 1200');
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    // Add background rect
+    const backgroundRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    backgroundRect.setAttribute('width', '100%');
+    backgroundRect.setAttribute('height', '100%');
+    backgroundRect.setAttribute('fill', '#121212');
+    clonedSvg.insertBefore(backgroundRect, clonedSvg.firstChild);
+
+    // Include all styles
+    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleElement.textContent = `
+        .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #aaaaaa; stroke-width: 2px; }
+        .temporal-box-label { fill: #f5f5f5; font-size: 14px; text-anchor: middle; }
+        .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #aaaaaa; stroke-width: 0.5px; stroke-dasharray: 2,2; }
+        .swimlane-label { fill: #aaaaaa; font-size: 12px; text-anchor: start; }
+        .node { stroke: #121212; stroke-width: 1.5px; }
+        .node.jonas { fill: #3498db; }
+        .node.martha { fill: #e74c3c; }
+        .node.other { fill: #2ecc71; }
+        .node.important { fill: #ffd700; }
+        .node.death { stroke: #8e44ad; stroke-width: 2px; }
+        .edge { stroke: rgba(255, 255, 255, 0.7); stroke-width: 1.5px; fill: none; opacity: 0.8; }
+        .summarized-edge { stroke: rgba(255, 255, 255, 0.6); stroke-width: 1.5px; stroke-dasharray: 4,3; fill: none; opacity: 0.7; }
+        .transition-path { fill-opacity: 0.3; stroke: none; }
+        .transition-path.jonas { fill: #3498db; }
+        .transition-path.martha { fill: #e74c3c; }
+        .transition-path.other { fill: #2ecc71; }
+    `;
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 12288;
+    canvas.height = 1200;
+    const ctx = canvas.getContext('2d');
+
+    // Create the canvg instance and render it synchronously
+    const v = canvg.Canvg.fromString(ctx, svgData);
+    v.start(); // 🔧 no .then()
+
+    // After rendering, get the PNG data
+    const pngUrl = canvas.toDataURL('image/png');
+
+    // Create a download link and trigger it
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngUrl;
+    downloadLink.download = 'dark-visualization.png';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+};
+
