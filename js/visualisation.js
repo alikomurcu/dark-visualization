@@ -74,6 +74,13 @@ const Visualization = (() => {
         renderSwimlanes();
         renderTransitions();
         renderNodes();
+        
+        // Render the legend at the end to ensure it's on top
+        // Call the external legend function from legend.js
+        renderGraphLegend(zoomGroup, layout, LayoutLogic);
+        
+        // Add zoom behavior after rendering
+        //svg.call(zoom);
     };
     
     /**
@@ -683,10 +690,14 @@ const Visualization = (() => {
     const hideTooltip = () => {
         tooltip.style('display', 'none');
     };
-    
+
+    // Render the legend using the external module
+    // This function is imported from legend.js
+
     // Public API
     return {
-        initialize
+        initialize,
+        renderGraphLegend
     };
 })();
 

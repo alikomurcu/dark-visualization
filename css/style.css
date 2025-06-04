@@ -351,6 +351,63 @@ button:hover {
     z-index: -1;
 }
 
+/* In-graph legend styles */
+.graph-legend .temporal-box {
+    /* Make sure the temporal box has the correct styling */
+    fill: rgba(60, 60, 60, 0.8);
+    stroke: #aaaaaa;
+    stroke-width: 2px;
+}
+
+.legend-section-title {
+    fill: #f5f5f5;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Note label inside nodes */
+.legend-node-label {
+    fill: #ffffff;
+    /* Font size is set inline for better control */
+    pointer-events: none;
+    dominant-baseline: middle;
+}
+
+/* Edge labels */
+.legend-edge-label {
+    fill: #f5f5f5;
+    /* Font size is set inline */
+    pointer-events: none;
+}
+
+/* Time travel edges in the legend */
+.time-travel-past-edge-legend {
+    stroke: #3498db;
+    stroke-width: 2px;
+    filter: url(#glow-blue);
+}
+
+.time-travel-future-edge-legend {
+    stroke: #e67e22;
+    stroke-width: 2px;
+    filter: url(#glow-orange);
+}
+
+/* Removed unnecessary styles */
+
+/* Time travel edge styling for legend */
+.time-travel-past-edge-legend {
+    stroke: #64b5f6;
+    stroke-width: 2.5px;
+    filter: url(#glow-blue);
+}
+
+.time-travel-future-edge-legend {
+    stroke: #ff9800;
+    stroke-width: 2.5px;
+    filter: url(#glow-orange);
+}
+
 .transition-path {
     fill-opacity: 0.3;
     stroke: none;
