@@ -201,6 +201,28 @@ const DataParser = (() => {
     };
     
     /**
+     * Determine the world of an event
+     * @param {Object} event - Event object
+     * @returns {String} World category ('jonas', 'martha', or 'origin')
+     */
+    const getWorld = event => {
+        // If world is specified in the event data, use that
+        if (event.world) {
+            // Normalize the world names
+            if (event.world.toLowerCase().includes('jonas')) {
+                return 'jonas';
+            } else if (event.world.toLowerCase().includes('martha')) {
+                return 'martha';
+            } else if (event.world.toLowerCase().includes('origin')) {
+                return 'origin';
+            }
+        }
+        
+        // Default to 'other' if world isn't specified or doesn't match known worlds
+        return 'other';
+    };
+    
+    /**
      * Get all edges between events in different time ranges
      * @returns {Array} Edges that span across time ranges
      */
@@ -298,6 +320,7 @@ const DataParser = (() => {
         getEventsForCharacter,
         getEventsForCharacterInTimeRange,
         getPrimaryCharacter,
+        getWorld,
         getCrossTimeRangeEdges,
         getEdgesInTimeRange,
         isSummarizedEdge

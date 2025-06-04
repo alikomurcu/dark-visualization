@@ -101,7 +101,15 @@ const Visualization = (() => {
                 characterType: 'jonas',            // Target swimlane
                 width: 80,                         // Image width
                 height: 80,                        // Image height
-                margin: 2500                         // Minimum margin to keep from nodes
+                margin: 25                         // Minimum margin to keep from nodes
+            },
+            {
+                imageUrl: 'images/jonas/old.jpg',  // Path to the image
+                timeRange: '1911-1911',            // Target temporal box
+                characterType: 'jonas',            // Target swimlane
+                width: 80,                         // Image width
+                height: 80,                        // Image height
+                margin: 25                         // Minimum margin to keep from nodes
             }
             // More images can be added here later
         ];
@@ -698,8 +706,8 @@ const Visualization = (() => {
             .attr('class', 'nodes');
         
         // Define node dimensions
-        const nodeWidth = 120; // Width of the rectangle
-        const nodeHeight = 60; // Height of the rectangle
+        const nodeWidth = 130; // Width of the rectangle
+        const nodeHeight = 80; // Height of the rectangle
         const cornerRadius = 8; // Rounded corner radius
         
         // Define border colors for event types
@@ -727,8 +735,9 @@ const Visualization = (() => {
         // Add rectangle for each node
         nodeGroups.append('rect')
             .attr('class', d => {
-                const primaryChar = DataParser.getPrimaryCharacter(d);
-                let classes = `node ${primaryChar}`;
+                // Use world for background color instead of primary character
+                const world = DataParser.getWorld(d);
+                let classes = `node ${world}`;
                 const position = layout.nodePositions[d.id];
                 if (position && position.lane === 'start') {
                     classes += ' start';
@@ -789,10 +798,10 @@ const Visualization = (() => {
             .attr('y', nodeHeight / 2)
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'middle')
-            .style('fill', '#ffffff') // White text
+            .style('fill', '#000000') // Black text
             .text(d => {
                 // Truncate description if it's too long
-                const maxLength = 40;
+                const maxLength = 80;
                 let text = d.description || '';
                 return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
             })
