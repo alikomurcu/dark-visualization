@@ -372,72 +372,165 @@ const Visualization = (() => {
         const nodesGroup = zoomGroup.append('g')
             .attr('class', 'nodes');
         
-        // Draw nodes
-        nodesGroup.selectAll('.node')
+        // Define node dimensions
+        const nodeWidth = 120; // Width of the rectangle
+        const nodeHeight = 60; // Height of the rectangle
+        const cornerRadius = 8; // Rounded corner radius
+        
+        // Define border colors for event types
+        const borderColors = {
+            death: '#8e44ad', // Purple for death events
+            romantic: '#e74c3c', // Red for romantic events
+            missing: '#f39c12', // Orange for missing person events
+            timeTravel: '#3498db' // Blue for time travel events
+        };
+        
+        // Create node groups
+        const nodeGroups = nodesGroup.selectAll('.node-group')
             .data(data.events)
             .enter()
-            .append('path')
+            .append('g')
+            .attr('class', 'node-group')
+            .attr('transform', d => {
+                const position = layout.nodePositions[d.id];
+                if (!position) return 'translate(0,0)';
+                return `translate(${position.x - nodeWidth/2}, ${position.y - nodeHeight/2})`;
+            })
+            .on('mouseover', showTooltip)
+            .on('mouseout', hideTooltip);
+        
+        // Add rectangle for each node
+        nodeGroups.append('rect')
             .attr('class', d => {
                 const primaryChar = DataParser.getPrimaryCharacter(d);
                 let classes = `node ${primaryChar}`;
-                if (d.importantTrigger) classes += ' important';
-                if (d.death) classes += ' death';
-                if (d.isRomantic) classes += ' romantic';
-                if (d.isMissing) classes += ' missing';
-                if (d.isTimeTravel) classes += ' time-travel';
-                
-                // Add start node class for nodes with no incoming edges
                 const position = layout.nodePositions[d.id];
                 if (position && position.lane === 'start') {
                     classes += ' start';
                 }
-                
                 return classes;
             })
-            .attr('d', d => {
-                const size = 10;
+            .attr('width', nodeWidth)
+            .attr('height', nodeHeight)
+            .attr('rx', cornerRadius)
+            .attr('ry', cornerRadius)
+            .style('stroke-width', d => {
+                // Apply thicker yellow border for important trigger events
+                if (d.importantTrigger) return '3px';
+                return '2px';
+            })
+            .style('stroke', d => {
+                // Define border color based on event type
+                if (d.importantTrigger) return '#ffd700'; // Golden border for important events
+                else if (d.death) return borderColors.death;
+                else if (d.isRomantic) return borderColors.romantic;
+                else if (d.isMissing) return borderColors.missing;
+                else if (d.isTimeTravel) return borderColors.timeTravel;
+                return '#ffffff'; // Default white border
+            })
+            // Apply a second border for important trigger events
+            .each(function(d) {
+                const rect = d3.select(this);
                 
-                // Define shapes based on event properties
-                if (d.isRomantic) {
-                    // Triangle pointing up
-                    return `M 0 -${size} L -${size} ${size} L ${size} ${size} Z`;
-                } else if (d.isMissing) {
-                    // Square
-                    return `M -${size} -${size} L ${size} -${size} L ${size} ${size} L -${size} ${size} Z`;
-                } else if (d.isTimeTravel) {
-                    // Star shape
-                    const points = 5;
-                    const outerRadius = size;
-                    const innerRadius = size * 0.4;
-                    let path = '';
-                    for (let i = 0; i < points * 2; i++) {
-                        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                        const angle = (i * Math.PI) / points;
-                        const x = radius * Math.sin(angle);
-                        const y = -radius * Math.cos(angle);
-                        path += (i === 0 ? 'M' : 'L') + ` ${x} ${y}`;
-                    }
-                    return path + 'Z';
-                } else if (d.death) {
-                    // Cross shape
-                    const crossSize = size * 1.5;
-                    return `M -${crossSize} -${crossSize} L ${crossSize} ${crossSize} M -${crossSize} ${crossSize} L ${crossSize} -${crossSize}`;
-                } else if (d.importantTrigger) {
-                    const tgSize = size * 1.5;
-                    return `M 0 0 m -${tgSize}, 0 a ${tgSize},${tgSize} 0 1,0 ${tgSize * 2},0 a ${tgSize},${tgSize} 0 1,0 -${tgSize * 2},0`;
+                // If it's an important event AND also has another property (death, romantic, etc.)
+                // Add a second rectangle with the appropriate border color under the gold one
+                if (d.importantTrigger && (d.death || d.isRomantic || d.isMissing || d.isTimeTravel)) {
+                    const parentGroup = d3.select(this.parentNode);
+                    
+                    // Insert a background rectangle before the current one
+                    parentGroup.insert('rect', 'rect')
+                        .attr('width', nodeWidth + 6) // Slightly larger
+                        .attr('height', nodeHeight + 6)
+                        .attr('rx', cornerRadius + 2)
+                        .attr('ry', cornerRadius + 2)
+                        .attr('x', -3) // Center it
+                        .attr('y', -3)
+                        .style('stroke-width', '2px')
+                        .style('fill', 'none') // Transparent fill
+                        .style('stroke', () => {
+                            if (d.death) return borderColors.death;
+                            else if (d.isRomantic) return borderColors.romantic;
+                            else if (d.isMissing) return borderColors.missing;
+                            else if (d.isTimeTravel) return borderColors.timeTravel;
+                            return '#ffffff';
+                        });
                 }
-                else {
-                    // Circle (default shape)
-                    return `M 0 0 m -${size}, 0 a ${size},${size} 0 1,0 ${size * 2},0 a ${size},${size} 0 1,0 -${size * 2},0`;
-                }
+            });
+        
+        // Add text for event descriptions
+        nodeGroups.append('text')
+            .attr('class', 'node-text')
+            .attr('x', nodeWidth / 2)
+            .attr('y', nodeHeight / 2)
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'middle')
+            .style('fill', '#ffffff') // White text
+            .text(d => {
+                // Truncate description if it's too long
+                const maxLength = 40;
+                let text = d.description || '';
+                return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
             })
-            .attr('transform', d => {
-                const position = layout.nodePositions[d.id];
-                return `translate(${position.x}, ${position.y})`;
-            })
-            .on('mouseover', showTooltip)
-            .on('mouseout', hideTooltip);
+            .call(wrap, nodeWidth - 10); // Wrap text with 5px padding on each side
     };
+    
+    /**
+     * Helper function to wrap text within a given width
+     * @param {Selection} text - D3 selection of text elements
+     * @param {Number} width - Maximum width for the text
+     */
+    const wrap = (text, width) => {
+        text.each(function() {
+            const text = d3.select(this);
+            const words = text.text().split(/\s+/).reverse();
+            const lineHeight = 1.1; // ems
+            const y = text.attr('y');
+            const dy = parseFloat(text.attr('dy') || 0);
+            
+            let word;
+            let line = [];
+            let lineNumber = 0;
+            let tspan = text.text(null).append('tspan')
+                .attr('x', text.attr('x'))
+                .attr('y', y)
+                .attr('dy', dy + 'em');
+            
+            // Limit to maximum 3 lines
+            const MAX_LINES = 3;
+            
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(' '));
+                
+                if (tspan.node().getComputedTextLength() > width) {
+                    line.pop();
+                    tspan.text(line.join(' '));
+                    line = [word];
+                    
+                    lineNumber++;
+                    if (lineNumber >= MAX_LINES - 1) {
+                        // For the last line, add ellipsis if there are more words
+                        if (words.length > 0) {
+                            line.push('...');
+                            tspan = text.append('tspan')
+                                .attr('x', text.attr('x'))
+                                .attr('y', y)
+                                .attr('dy', lineNumber * lineHeight + dy + 'em')
+                                .text(line.join(' '));
+                            break;
+                        }
+                    }
+                    
+                    tspan = text.append('tspan')
+                        .attr('x', text.attr('x'))
+                        .attr('y', y)
+                        .attr('dy', lineNumber * lineHeight + dy + 'em')
+                        .text(word);
+                }
+            }
+        });
+    };
+
     
     /**
      * Show tooltip for a node
