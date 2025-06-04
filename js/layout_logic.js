@@ -12,8 +12,8 @@ const LayoutLogic = (() => {
 
 
     // Constants for layout dimensions
-    const MARGIN = { top: FIXED_HEIGHT*0.066, right: FIXED_WIDTH*0.0146, bottom: FIXED_HEIGHT*0.066, left: FIXED_WIDTH*0.0146 };
-    const BOX_SPACING = FIXED_WIDTH*0.0146; // Increased spacing between temporal boxes
+    const MARGIN = { top: FIXED_HEIGHT*0.08, right: FIXED_WIDTH*0.03, bottom: FIXED_HEIGHT*0.08, left: FIXED_WIDTH*0.03 };
+    const BOX_SPACING = FIXED_WIDTH*0.025; // Increased spacing between temporal boxes
     const BOX_MIN_WIDTH = FIXED_WIDTH*0.028; // Much wider minimum box width to utilize full graph width
     const BOX_MAX_WIDTH = FIXED_WIDTH*0.18; // Much wider maximum box width
     const MIN_SWIMLANE_HEIGHT = FIXED_HEIGHT*0.06; // Increased height for swimlanes
@@ -21,7 +21,7 @@ const LayoutLogic = (() => {
     const NODE_WIDTH = FIXED_WIDTH*0.012;
     const NODE_HEIGHT = FIXED_HEIGHT*0.06;
     const NODE_RADIUS = FIXED_WIDTH*0.028; // Keep for backwards compatibility
-    const NODE_MARGIN = FIXED_WIDTH*0.012; // Increased margin between nodes
+    const NODE_MARGIN = FIXED_WIDTH*0.025; // Increased margin between nodes
     const TRANSITION_CURVE_FACTOR = 0.5;
 
     
@@ -374,7 +374,6 @@ const LayoutLogic = (() => {
      */
     const calculateNodePositions = data => {
         nodePositions = {};
-        const defaultRadius = NODE_RADIUS;
     
         // Create simulation nodes: clone events with swimlane & box info
         const nodes = data.events.map(event => {
@@ -434,56 +433,85 @@ const LayoutLogic = (() => {
             };
         });
 
-        // ➡️ Keep original logic for start nodes
-        const startNodes = data.startNodes || [];
-
-        startNodes.forEach((startNode, index) => {
+        // Handle start nodes - nodes that have only outgoing edges
+        const startNodes = [];
+        data.events.forEach(event => {
+            const incomingEdges = data.edges.filter(edge => edge.target === event.id);
+            const outgoingEdges = data.edges.filter(edge => edge.source === event.id);
+            
+            if (incomingEdges.length === 0 && outgoingEdges.length > 0) {
+                startNodes.push(event);
+            }
+        });
+        
+        // Group start nodes by target temporal box for better positioning
+        const startNodesByBox = {};
+        
+        // First, analyze and group start nodes by their target temporal box
+        startNodes.forEach(startNode => {
             const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
-
+            
             if (outgoingEdges.length > 0) {
                 const targetEventIds = outgoingEdges.map(edge => edge.target);
                 const targetEvents = data.events.filter(event => targetEventIds.includes(event.id));
-
+                
                 if (targetEvents.length > 0) {
+                    // Find the earliest target event
                     const earliestTarget = [...targetEvents].sort((a, b) => a.date - b.date)[0];
-                    const targetPosition = nodePositions[earliestTarget.id];
-
-                    if (targetPosition) {
-                        const targetBox = temporalBoxes.find(box =>
-                            box.start <= earliestTarget.year && box.end >= earliestTarget.year
-                        );
-
-                        if (targetBox) {
-                            const isAbove = index % 2 === 0;
-                            // Position start nodes further away to accommodate the larger node size
-                            const xPos = targetBox.x - NODE_WIDTH - NODE_MARGIN;
-                            const yPos = isAbove
-                                ? targetBox.y - NODE_HEIGHT - NODE_MARGIN
-                                : targetBox.y + targetBox.height + NODE_MARGIN;
-
-                            nodePositions[startNode.id] = {
-                                x: xPos,
-                                y: yPos,
-                                lane: 'start',
-                                timeRange: null
+                    const targetBox = getTemporalBoxForEvent(earliestTarget);
+                    
+                    if (targetBox) {
+                        // Group by target box ID
+                        const boxId = targetBox.start + '-' + targetBox.end;
+                        if (!startNodesByBox[boxId]) {
+                            startNodesByBox[boxId] = {
+                                box: targetBox,
+                                nodes: []
                             };
                         }
+                        startNodesByBox[boxId].nodes.push({
+                            node: startNode,
+                            targetEvent: earliestTarget
+                        });
                     }
                 }
             }
         });
-
-        // ➡️ Fallback for start nodes without linked targets
-        startNodes.forEach((node, i) => {
-            if (!nodePositions[node.id] && temporalBoxes.length > 0) {
-                const firstBox = temporalBoxes[0];
-                nodePositions[node.id] = {
-                    x: firstBox.x - NODE_WIDTH - NODE_MARGIN,
-                    y: firstBox.y + (i % 2 === 0 ? -NODE_HEIGHT - NODE_MARGIN : firstBox.height + NODE_MARGIN),
+        
+        // Now position start nodes horizontally next to their target boxes
+        Object.keys(startNodesByBox).forEach(boxId => {
+            const { box, nodes } = startNodesByBox[boxId];
+            const NODE_MARGIN = 20; // Space between nodes
+            
+            // Position nodes in two rows if there are more than 3 nodes
+            const numNodes = nodes.length;
+            const maxNodesPerRow = Math.ceil(numNodes / 2);
+            
+            nodes.forEach((nodeInfo, i) => {
+                const row = i < maxNodesPerRow ? 0 : 1; // 0 = top row, 1 = bottom row
+                const col = i % maxNodesPerRow;
+                
+                // Position horizontally outside the box
+                const xOffset = box.x - NODE_WIDTH - NODE_MARGIN - (col * (NODE_WIDTH + NODE_MARGIN));
+                
+                // Position either above or below the box depending on row
+                let yPos;
+                if (row === 0) {
+                    // Top row positioned above the box
+                    yPos = box.y - NODE_HEIGHT - NODE_MARGIN;
+                } else {
+                    // Bottom row positioned below the box
+                    yPos = box.y + box.height + NODE_MARGIN;
+                }
+                
+                // Store the position
+                nodePositions[nodeInfo.node.id] = {
+                    x: xOffset,
+                    y: yPos,
                     lane: 'start',
                     timeRange: null
                 };
-            }
+            });
         });
     };
     
