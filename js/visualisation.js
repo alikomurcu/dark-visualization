@@ -63,12 +63,16 @@ const Visualization = (() => {
         // Clear previous content
         zoomGroup.selectAll('*').remove();
         
-        // Render components
+        // Create a specific group for time travel edges that will be rendered first (beneath everything)
+        zoomGroup.append('g')
+            .attr('class', 'timetravel-edges');
+            
+        // Render components in order of layering (bottom to top)
         renderStartArea();
+        renderEdges(); // Render edges first (regular edges go above time travel edges but below boxes)
         renderTemporalBoxes();
         renderSwimlanes();
         renderTransitions();
-        renderEdges();
         renderNodes();
     };
     
@@ -97,6 +101,69 @@ const Visualization = (() => {
             .attr('y', d => d.y)
             .attr('width', d => d.width)
             .attr('height', d => d.height);
+        
+        // Add arrow marker for edges and glow filter for time travel edges
+        const defs = svg.append('defs');
+        
+        // Standard arrow marker
+        defs.append('marker')
+            .attr('id', 'arrow')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('class', 'arrowHead');
+            
+        // Time travel arrow marker for past (blue glow effect)
+        defs.append('marker')
+            .attr('id', 'timetravel-past-arrow')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('class', 'timetravel-past-arrowHead');
+            
+        // Time travel arrow marker for future (orange glow effect)
+        defs.append('marker')
+            .attr('id', 'timetravel-future-arrow')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('class', 'timetravel-future-arrowHead');
+            
+        // Add glow filter for time travel edges
+        const filter = defs.append('filter')
+            .attr('id', 'glow-effect')
+            .attr('x', '-50%')
+            .attr('y', '-50%')
+            .attr('width', '200%')
+            .attr('height', '200%');
+            
+        // Glow blur effect
+        filter.append('feGaussianBlur')
+            .attr('stdDeviation', '3')
+            .attr('result', 'blur');
+            
+        // Making the glow more pronounced using feComponentTransfer
+        const componentTransfer = filter.append('feComponentTransfer');
+        componentTransfer.append('feFuncR').attr('type', 'linear').attr('slope', '2');
+        componentTransfer.append('feFuncG').attr('type', 'linear').attr('slope', '2');
+        componentTransfer.append('feFuncB').attr('type', 'linear').attr('slope', '2');
+        
+        // Merge the original shape with the blur effect
+        const merge = filter.append('feMerge');
+        merge.append('feMergeNode').attr('in', 'blur');
+        merge.append('feMergeNode').attr('in', 'SourceGraphic');
         
         // Add labels
         boxesGroup.selectAll('.temporal-box-label')
@@ -236,6 +303,20 @@ const Visualization = (() => {
                 const { source, target, sourceEvent, targetEvent } = edge;
                 const isSummarized = DataParser.isSummarizedEdge(edge.edge);
                 
+                // Determine if this is a time travel edge based on source or target events
+                const isTimeTravelEdge = sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel;
+                
+                // Determine time travel direction (to future or to past)
+                let timeTravelDirection = null;
+                if (isTimeTravelEdge) {
+                    const sourceDate = sourceEvent ? new Date(sourceEvent.date) : null;
+                    const targetDate = targetEvent ? new Date(targetEvent.date) : null;
+                    
+                    if (sourceDate && targetDate) {
+                        timeTravelDirection = sourceDate < targetDate ? 'future' : 'past';
+                    }
+                }
+                
                 // Calculate path with bundling adjustments
                 let pathData;
                 let strokeColor = 'white';
@@ -349,17 +430,45 @@ const Visualization = (() => {
                     }
 
                     strokeColor = 'white';
-                    if (sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel) strokeColor = 'red';
-                    strokeWidth = 2;
+                    strokeWidth = isTimeTravelEdge ? 3 : 2;
                 }
 
-                // Create path element
-                edgesGroup.append('path')
-                    .attr('class', isSummarized ? 'summarized-edge' : 'edge')
+                // Create separate groups for regular edges and time travel edges (for z-ordering)
+                // Time travel edges should be drawn below all other elements
+                const targetGroup = isTimeTravelEdge ? 
+                    zoomGroup.select('.timetravel-edges').size() ? 
+                        zoomGroup.select('.timetravel-edges') : 
+                        zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges') : 
+                    edgesGroup;
+                
+                // Determine appropriate CSS class and color based on time travel direction
+                let edgeClass = isTimeTravelEdge ? 
+                    (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : 
+                    (isSummarized ? 'summarized-edge' : 'edge');
+                    
+                let edgeColor = strokeColor;
+                if (isTimeTravelEdge) {
+                    edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6'; // Orange for future, blue for past
+                }
+                
+                // Create path element with appropriate styling
+                targetGroup.append('path')
+                    .attr('class', edgeClass)
                     .attr('d', pathData)
-                    .attr('marker-end', 'url(#arrow)')
-                    .style('stroke', strokeColor)
-                    .style('stroke-width', strokeWidth);
+                    .attr('marker-end', isTimeTravelEdge ? 
+                        (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') : 
+                        'url(#arrow)')
+                    .style('stroke', edgeColor) 
+                    .style('stroke-width', isTimeTravelEdge ? 4 : strokeWidth) // Wider stroke for time travel
+                    .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
+                    .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
+                    .style('stroke-linecap', 'round')
+                    .style('stroke-linejoin', 'round');
+                    
+                // Set the appropriate glow color in the filter if it's a time travel edge
+                if (isTimeTravelEdge) {
+                    // The actual glow color is managed via CSS classes
+                }
             });
         });
     };
