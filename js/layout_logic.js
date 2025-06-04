@@ -4,19 +4,26 @@
  */
 
 const LayoutLogic = (() => {
-    // Constants for layout dimensions
-    const MARGIN = { top: 50, right: 80, bottom: 50, left: 150 };
-    const BOX_SPACING = 120; // Increased spacing between temporal boxes
-    const BOX_MIN_WIDTH = 200; // Wider minimum box width
-    const BOX_MAX_WIDTH = 500; // Wider maximum box width
-    const MIN_SWIMLANE_HEIGHT = 60;
-    const NODE_RADIUS = 6;
-    const NODE_MARGIN = 30;
-    const TRANSITION_CURVE_FACTOR = 0.5;
+
     // Fixed dimensions for the graph (12288 x 1200 pixels)
     const FIXED_WIDTH = 12288;
     const FIXED_HEIGHT = 1200;
     const ASPECT_RATIO = FIXED_WIDTH / FIXED_HEIGHT; // 10.24:1
+
+
+    // Constants for layout dimensions
+    const MARGIN = { top: FIXED_HEIGHT*0.066, right: FIXED_WIDTH*0.0146, bottom: FIXED_HEIGHT*0.066, left: FIXED_WIDTH*0.0146 };
+    const BOX_SPACING = FIXED_WIDTH*0.0146; // Increased spacing between temporal boxes
+    const BOX_MIN_WIDTH = FIXED_WIDTH*0.028; // Much wider minimum box width to utilize full graph width
+    const BOX_MAX_WIDTH = FIXED_WIDTH*0.18; // Much wider maximum box width
+    const MIN_SWIMLANE_HEIGHT = FIXED_HEIGHT*0.06; // Increased height for swimlanes
+    // Node dimensions for rectangular nodes
+    const NODE_WIDTH = FIXED_WIDTH*0.012;
+    const NODE_HEIGHT = FIXED_HEIGHT*0.06;
+    const NODE_RADIUS = FIXED_WIDTH*0.028; // Keep for backwards compatibility
+    const NODE_MARGIN = FIXED_WIDTH*0.012; // Increased margin between nodes
+    const TRANSITION_CURVE_FACTOR = 0.5;
+
     
     // Main characters for swimlanes
     const MAIN_CHARACTERS = [
@@ -391,9 +398,9 @@ const LayoutLogic = (() => {
     
         // Create the simulation
         const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(50).strength(0.1))
-            .force("charge", d3.forceManyBody().strength(-50))
-            .force("collision", d3.forceCollide(defaultRadius + 2))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(NODE_WIDTH).strength(0.1))
+            .force("charge", d3.forceManyBody().strength(-150)) // Increased repulsion
+            .force("collision", d3.forceCollide().radius(d => Math.sqrt((NODE_WIDTH/2)**2 + (NODE_HEIGHT/2)**2) + 10)) // Diagonal radius of rectangle + padding
             .force("boxX", d3.forceX(d => d.box.x + d.box.width / 2).strength(0.05))
             .force("swimlaneY", d3.forceY(d => d.swimlane.y + d.swimlane.height / 2).strength(0.1))
             .stop();
@@ -405,11 +412,19 @@ const LayoutLogic = (() => {
     
         // Clamp nodes back within their boxes
         nodes.forEach(node => {
-            const r = defaultRadius;
+            // Use half width/height to ensure node center stays within box boundaries
+            const halfWidth = NODE_WIDTH / 2;
+            const halfHeight = NODE_HEIGHT / 2;
             const lane = node.swimlane;
-    
-            node.x = Math.max(lane.x + r, Math.min(lane.x + lane.width - r, node.x));
-            node.y = Math.max(lane.y + r, Math.min(lane.y + lane.height - r, node.y));
+            
+            // Add some padding to avoid touching edges
+            const padding = 10;
+            
+            // Clamp node position to ensure the entire rectangle stays within the lane
+            node.x = Math.max(lane.x + halfWidth + padding, 
+                        Math.min(lane.x + lane.width - halfWidth - padding, node.x));
+            node.y = Math.max(lane.y + halfHeight + padding, 
+                        Math.min(lane.y + lane.height - halfHeight - padding, node.y));
     
             nodePositions[node.id] = {
                 x: node.x,
@@ -440,9 +455,10 @@ const LayoutLogic = (() => {
 
                         if (targetBox) {
                             const isAbove = index % 2 === 0;
-                            const xPos = targetBox.x - NODE_MARGIN;
+                            // Position start nodes further away to accommodate the larger node size
+                            const xPos = targetBox.x - NODE_WIDTH - NODE_MARGIN;
                             const yPos = isAbove
-                                ? targetBox.y - NODE_MARGIN
+                                ? targetBox.y - NODE_HEIGHT - NODE_MARGIN
                                 : targetBox.y + targetBox.height + NODE_MARGIN;
 
                             nodePositions[startNode.id] = {
@@ -462,8 +478,8 @@ const LayoutLogic = (() => {
             if (!nodePositions[node.id] && temporalBoxes.length > 0) {
                 const firstBox = temporalBoxes[0];
                 nodePositions[node.id] = {
-                    x: firstBox.x - NODE_MARGIN,
-                    y: firstBox.y + (i % 2 === 0 ? -NODE_MARGIN : firstBox.height + NODE_MARGIN),
+                    x: firstBox.x - NODE_WIDTH - NODE_MARGIN,
+                    y: firstBox.y + (i % 2 === 0 ? -NODE_HEIGHT - NODE_MARGIN : firstBox.height + NODE_MARGIN),
                     lane: 'start',
                     timeRange: null
                 };
