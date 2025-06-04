@@ -224,15 +224,15 @@ const Visualization = (() => {
         const transitionsGroup = zoomGroup.append('g')
             .attr('class', 'transitions');
         
-        // Generate transitions for each character type between adjacent temporal boxes
-        // Only create smooth transitions for Jonas and Martha lanes
-        const characterTypes = ['jonas', 'martha'];
+        // Jonas and Martha transitions
+        const mainCharacterTypes = ['jonas', 'martha'];
         
         for (let i = 0; i < layout.swimlanes.length - 1; i++) {
             const sourceSwimlane = layout.swimlanes[i];
             const targetSwimlane = layout.swimlanes[i + 1];
             
-            characterTypes.forEach(type => {
+            // Handle main character transitions first
+            mainCharacterTypes.forEach(type => {
                 // Find matching lanes in source and target
                 const sourceLane = sourceSwimlane.lanes.find(lane => lane.type === type);
                 const targetLane = targetSwimlane.lanes.find(lane => lane.type === type);
@@ -244,6 +244,19 @@ const Visualization = (() => {
                         .attr('d', LayoutLogic.generateTransitionPath(sourceLane, targetLane));
                 }
             });
+            
+            // Handle the "Others" lane specifically - looking for the bottom lane labeled "Others"
+            const sourceOthersLane = sourceSwimlane.lanes.find(lane => 
+                lane.type === 'other' && lane.shortName === 'Others');
+            const targetOthersLane = targetSwimlane.lanes.find(lane => 
+                lane.type === 'other' && lane.shortName === 'Others');
+            
+            if (sourceOthersLane && targetOthersLane) {
+                // Draw smooth transition path
+                transitionsGroup.append('path')
+                    .attr('class', 'transition-path other')
+                    .attr('d', LayoutLogic.generateTransitionPath(sourceOthersLane, targetOthersLane));
+            }
         }
     };
     
