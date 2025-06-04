@@ -19,8 +19,8 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
         .attr('class', 'graph-legend');
         
     // ===== FIXED DIMENSIONS FOR CLEAR LAYOUT =====
-    const legendWidth = 250;  // Wider box for better spacing
-    const legendHeight = lastBox.height * 0.85;
+    const legendWidth = 280;  // Wider box for better spacing and text
+    const legendHeight = lastBox.height * 0.92; // Taller to fit larger nodes
     const legendX = lastBox.x + lastBox.width + LayoutLogic.BOX_SPACING;
     const legendY = lastBox.y + (lastBox.height - legendHeight) / 2;
     
@@ -46,14 +46,16 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
         .text('LEGEND');
     
     // ===== FIXED SPACINGS =====
-    const leftPadding = 25;
+    const leftPadding = 35;
     const titleOffset = 35;
-    const sectionGap = 45;
-    const itemGap = 50;
-    const nodeWidth = 30;
-    const nodeHeight = 20;
+    const sectionGap = 55; // Increased gap between sections
+    const itemGap = 80; // Increased gap between items
+    
+    // Node dimensions matching the main visualization
+    const nodeWidth = 140; // Much wider for better visibility
+    const nodeHeight = 60; // Taller for better visibility
     const cornerRadius = 5;
-    const edgeLength = 80;
+    const edgeLength = 100; // Longer edges for better visibility
     
     // Starting coordinates
     let startX = legendX + leftPadding;
@@ -87,9 +89,9 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('Jonas');
+        .text("Jonas's World");
         
     currentY += itemGap;
     
@@ -108,9 +110,9 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('Martha');
+        .text("Martha's World");
         
     currentY += itemGap;
     
@@ -129,9 +131,9 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('Other');
+        .text('Other Character');
         
     currentY += itemGap;
     
@@ -150,9 +152,9 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('Important');
+        .text('Starting Event');
     
     // ===== SECTION 2: NODE BORDERS =====
     currentY += sectionGap;
@@ -179,18 +181,18 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
         .attr('ry', cornerRadius)
         .attr('fill', 'transparent')
         .attr('stroke', '#8e44ad')
-        .attr('stroke-width', '2px');
+        .attr('stroke-width', '3px');
         
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('Death');
+        .text('Death Event');
         
     currentY += itemGap;
     
-    // Time Travel event - orange border
+    // Time Travel event - blue border
     legendGroup.append('rect')
         .attr('x', startX)
         .attr('y', currentY - nodeHeight/2)
@@ -199,16 +201,58 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
         .attr('rx', cornerRadius)
         .attr('ry', cornerRadius)
         .attr('fill', 'transparent')
-        .attr('stroke', '#ff9800')
-        .attr('stroke-width', '2px');
+        .attr('stroke', '#3498db')
+        .attr('stroke-width', '3px');
         
     legendGroup.append('text')
         .attr('x', startX + nodeWidth + 10)
         .attr('y', currentY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
-        .text('T.Travel');
+        .text('Time Travel Event');
     
+    currentY += itemGap;
+
+    // Missing Person event - orange border
+    legendGroup.append('rect')
+        .attr('x', startX)
+        .attr('y', currentY - nodeHeight/2)
+        .attr('width', nodeWidth)
+        .attr('height', nodeHeight)
+        .attr('rx', cornerRadius)
+        .attr('ry', cornerRadius)
+        .attr('fill', 'transparent')
+        .attr('stroke', '#f39c12')
+        .attr('stroke-width', '3px');
+        
+    legendGroup.append('text')
+        .attr('x', startX + nodeWidth + 10)
+        .attr('y', currentY + 5)
+        .style('font-size', '13px')
+        .style('fill', '#ffffff')
+        .text('Time Travel Event');
+
+        currentY += itemGap;
+
+        // Romantic event - red border
+        legendGroup.append('rect')
+            .attr('x', startX)
+            .attr('y', currentY - nodeHeight/2)
+            .attr('width', nodeWidth)
+            .attr('height', nodeHeight)
+            .attr('rx', cornerRadius)
+            .attr('ry', cornerRadius)
+            .attr('fill', 'transparent')
+            .attr('stroke', '#e74c3c')
+            .attr('stroke-width', '3px');
+            
+        legendGroup.append('text')
+            .attr('x', startX + nodeWidth + 10)
+            .attr('y', currentY + 5)
+            .style('font-size', '13px')
+            .style('fill', '#ffffff')
+            .text('Time Travel Event');
+
     // ===== SECTION 3: EDGE TYPES =====
     currentY += sectionGap;
     
@@ -224,19 +268,35 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     
     currentY += titleOffset;
     
+    // Create a subgroup for edges to ensure they're visible
+    const edgeGroup = legendGroup.append('g')
+        .attr('class', 'legend-edges')
+        .style('z-index', '10'); // Ensure edges appear on top
+    
     // Time Travel Past - blue edge with glow
     const pastEdgeY = currentY;
-    legendGroup.append('path')
+    
+    // Adding extra edge elements to make the edges more visible
+    // Background glow for the edge
+    edgeGroup.append('path')
         .attr('d', `M${startX},${pastEdgeY} L${startX + edgeLength},${pastEdgeY}`)
         .attr('stroke', '#3498db')
-        .attr('stroke-width', '2px')
+        .attr('stroke-width', '6px')
+        .attr('stroke-opacity', '0.3')
+        .attr('filter', 'url(#glow-blue)');
+    
+    // Main edge line
+    edgeGroup.append('path')
+        .attr('d', `M${startX},${pastEdgeY} L${startX + edgeLength},${pastEdgeY}`)
+        .attr('stroke', '#3498db')
+        .attr('stroke-width', '2.5px')
         .attr('marker-end', 'url(#timetravel-past-arrow)')
         .attr('filter', 'url(#glow-blue)');
         
     legendGroup.append('text')
         .attr('x', startX + edgeLength + 10)
         .attr('y', pastEdgeY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
         .text('Time Travel Past');
         
@@ -244,17 +304,27 @@ function renderGraphLegend(zoomGroup, layout, LayoutLogic) {
     
     // Time Travel Future - orange edge with glow
     const futureEdgeY = currentY;
-    legendGroup.append('path')
+    
+    // Background glow for the edge
+    edgeGroup.append('path')
         .attr('d', `M${startX},${futureEdgeY} L${startX + edgeLength},${futureEdgeY}`)
         .attr('stroke', '#e67e22')
-        .attr('stroke-width', '2px')
+        .attr('stroke-width', '6px')
+        .attr('stroke-opacity', '0.3')
+        .attr('filter', 'url(#glow-orange)');
+    
+    // Main edge line
+    edgeGroup.append('path')
+        .attr('d', `M${startX},${futureEdgeY} L${startX + edgeLength},${futureEdgeY}`)
+        .attr('stroke', '#e67e22')
+        .attr('stroke-width', '2.5px')
         .attr('marker-end', 'url(#timetravel-future-arrow)')
         .attr('filter', 'url(#glow-orange)');
         
     legendGroup.append('text')
         .attr('x', startX + edgeLength + 10)
         .attr('y', futureEdgeY + 5)
-        .style('font-size', '12px')
+        .style('font-size', '13px')
         .style('fill', '#ffffff')
         .text('Time Travel Future');
 }

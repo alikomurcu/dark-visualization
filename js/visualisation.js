@@ -74,6 +74,7 @@ const Visualization = (() => {
         renderSwimlanes();
         renderTransitions();
         renderNodes();
+        renderCharacterImages(); // Add character images
         
         // Render the legend at the end to ensure it's on top
         // Call the external legend function from legend.js
@@ -81,6 +82,201 @@ const Visualization = (() => {
         
         // Add zoom behavior after rendering
         //svg.call(zoom);
+    };
+    
+    /**
+     * Render character images in specific temporal boxes and swimlanes
+     * with collision detection and avoidance for existing nodes
+     */
+    const renderCharacterImages = () => {
+        // Create a group for character images
+        const imagesGroup = zoomGroup.append('g')
+            .attr('class', 'character-images');
+        
+        // Define images to display with their positions
+        const characterImages = [
+            {
+                imageUrl: 'images/jonas/old.jpg',  // Path to the image
+                timeRange: '1888-1890',            // Target temporal box
+                characterType: 'jonas',            // Target swimlane
+                width: 80,                         // Image width
+                height: 80,                        // Image height
+                margin: 2500                         // Minimum margin to keep from nodes
+            }
+            // More images can be added here later
+        ];
+        
+        // Find and place each image with collision avoidance
+        characterImages.forEach(imageInfo => {
+            // Find the corresponding temporal box
+            const temporalBox = layout.temporalBoxes.find(box => 
+                `${box.start}-${box.end}` === imageInfo.timeRange);
+            
+            if (!temporalBox) return; // Skip if temporal box not found
+            
+            // Find the corresponding swimlane
+            const swimlaneIndex = layout.swimlanes.findIndex(s => 
+                s.timeRange.start === temporalBox.start && 
+                s.timeRange.end === temporalBox.end);
+            
+            if (swimlaneIndex === -1) return; // Skip if swimlane not found
+            
+            const swimlane = layout.swimlanes[swimlaneIndex];
+            const characterLane = swimlane.lanes.find(lane => lane.type === imageInfo.characterType);
+            
+            if (!characterLane) return; // Skip if character lane not found
+            
+            // Identify nodes within this swimlane to avoid
+            const nodesInSwimlane = [];
+            Object.values(layout.nodePositions).forEach(nodePos => {
+                // Check if node is in the same temporal box and character lane
+                if (nodePos.timeRange === imageInfo.timeRange && 
+                    nodePos.lane === imageInfo.characterType) {
+                    nodesInSwimlane.push({
+                        x: nodePos.x,
+                        y: nodePos.y,
+                        width: nodePos.width || 30, // Default node width if not specified
+                        height: nodePos.height || 30 // Default node height if not specified
+                    });
+                }
+            });
+            
+            // Find a position for the image that doesn't overlap with nodes
+            // Initial position constraints
+            const padding = 20;  // Padding from swimlane edges
+            const minX = characterLane.x + padding;
+            const minY = characterLane.y + padding;
+            const maxX = characterLane.x + characterLane.width - imageInfo.width - padding;
+            const maxY = characterLane.y + characterLane.height - imageInfo.height - padding;
+            
+            // Find the best position using a grid search approach
+            const gridSize = 20; // Step size for grid search
+            let bestPosition = null;
+            let minOverlapScore = Infinity;
+            
+            // Try positions in a grid pattern within the swimlane
+            for (let x = minX; x <= maxX; x += gridSize) {
+                for (let y = minY; y <= maxY; y += gridSize) {
+                    // Calculate overlap score for this position
+                    let overlapScore = 0;
+                    
+                    // Check overlap with each node
+                    nodesInSwimlane.forEach(node => {
+                        // Calculate distance between image center and node center
+                        const imgCenterX = x + imageInfo.width / 2;
+                        const imgCenterY = y + imageInfo.height / 2;
+                        const nodeCenterX = node.x + node.width / 2;
+                        const nodeCenterY = node.y + node.height / 2;
+                        
+                        // Calculate distance
+                        const dx = imgCenterX - nodeCenterX;
+                        const dy = imgCenterY - nodeCenterY;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Calculate minimum distance needed to avoid overlap
+                        const minDist = (imageInfo.width/2 + node.width/2 + imageInfo.margin) * 0.8 + 
+                                     (imageInfo.height/2 + node.height/2 + imageInfo.margin) * 0.8;
+                        
+                        // Add to score if there's overlap
+                        if (distance < minDist) {
+                            // Score is higher for bigger overlaps
+                            overlapScore += (minDist - distance) * 10;
+                        }
+                    });
+                    
+                    // Also prefer positions away from the edges
+                    const edgeProximity = 
+                        Math.min(x - minX, maxX - x, y - minY, maxY - y) / 
+                        Math.min(maxX - minX, maxY - minY);
+                    
+                    // Combine scores (lower is better)
+                    const totalScore = overlapScore - (edgeProximity * 5);
+                    
+                    // Update best position if this is better
+                    if (totalScore < minOverlapScore) {
+                        minOverlapScore = totalScore;
+                        bestPosition = { x, y };
+                    }
+                }
+            }
+            
+            // Use default position if no good position found
+            if (!bestPosition || minOverlapScore > 100) {
+                // Try to find any position that works
+                bestPosition = { 
+                    x: characterLane.x + padding, 
+                    y: characterLane.y + padding 
+                };
+                
+                // As a last resort, try the corners of the swimlane
+                const corners = [
+                    { x: minX, y: minY },                   // Top-left
+                    { x: maxX, y: minY },                   // Top-right
+                    { x: minX, y: maxY },                   // Bottom-left
+                    { x: maxX, y: maxY }                    // Bottom-right
+                ];
+                
+                // Find the corner with the least overlap
+                corners.forEach(corner => {
+                    let overlapScore = 0;
+                    
+                    nodesInSwimlane.forEach(node => {
+                        // Check if image at this corner overlaps with the node
+                        if (!(corner.x + imageInfo.width < node.x || 
+                              corner.x > node.x + node.width || 
+                              corner.y + imageInfo.height < node.y || 
+                              corner.y > node.y + node.height)) {
+                            overlapScore += 100;
+                        }
+                    });
+                    
+                    if (overlapScore < minOverlapScore) {
+                        minOverlapScore = overlapScore;
+                        bestPosition = corner;
+                    }
+                });
+            }
+            
+            // Use the best position found
+            const imgX = bestPosition.x;
+            const imgY = bestPosition.y;
+            const adjustedWidth = imageInfo.width;
+            const adjustedHeight = imageInfo.height;
+            
+            // Create clipping path for rounded corners
+            const clipId = `clip-${imageInfo.timeRange}-${imageInfo.characterType}`;
+            imagesGroup.append('clipPath')
+                .attr('id', clipId)
+                .append('rect')
+                .attr('x', imgX)
+                .attr('y', imgY)
+                .attr('width', adjustedWidth)
+                .attr('height', adjustedHeight)
+                .attr('rx', 8)
+                .attr('ry', 8);
+            
+            // Create image element
+            imagesGroup.append('image')
+                .attr('xlink:href', imageInfo.imageUrl)
+                .attr('x', imgX)
+                .attr('y', imgY)
+                .attr('width', adjustedWidth)
+                .attr('height', adjustedHeight)
+                .attr('clip-path', `url(#${clipId})`)
+                .style('opacity', 0.9);
+            
+            // Add decorative border
+            imagesGroup.append('rect')
+                .attr('x', imgX)
+                .attr('y', imgY)
+                .attr('width', adjustedWidth)
+                .attr('height', adjustedHeight)
+                .attr('rx', 8)
+                .attr('ry', 8)
+                .attr('fill', 'none')
+                .attr('stroke', '#3498db') // Blue border for Jonas
+                .attr('stroke-width', '2.5px');
+        });
     };
     
     /**
@@ -545,8 +741,8 @@ const Visualization = (() => {
             .attr('ry', cornerRadius)
             .style('stroke-width', d => {
                 // Apply thicker yellow border for important trigger events
-                if (d.importantTrigger) return '3px';
-                return '2px';
+                if (d.importantTrigger) return '5px';
+                return '4px';
             })
             .style('stroke', d => {
                 // Define border color based on event type
