@@ -17,12 +17,28 @@ const LayoutLogic = (() => {
     const BOX_MIN_WIDTH = FIXED_WIDTH*0.028; // Much wider minimum box width to utilize full graph width
     const BOX_MAX_WIDTH = FIXED_WIDTH*0.18; // Much wider maximum box width
     const MIN_SWIMLANE_HEIGHT = FIXED_HEIGHT*0.06; // Increased height for swimlanes
-    // Node dimensions for rectangular nodes
+    
+    // Node dimensions and spacing
     const NODE_WIDTH = FIXED_WIDTH*0.012;
     const NODE_HEIGHT = FIXED_HEIGHT*0.06;
     const NODE_RADIUS = FIXED_WIDTH*0.028; // Keep for backwards compatibility
-    const NODE_MARGIN = FIXED_WIDTH*0.025; // Increased margin between nodes
+    const NODE_MARGIN = FIXED_WIDTH*0.025; // Horizontal margin between nodes
+    const NODE_VERTICAL_MARGIN = FIXED_HEIGHT*0.03; // Vertical margin between nodes and boxes
+    const START_NODE_SPACING = FIXED_WIDTH*0.015; // Spacing between start nodes
+    const START_NODE_BOX_SPACING = FIXED_HEIGHT*0.015; // Vertical spacing between start nodes and temporal boxes
+    
+    // Force simulation parameters
+    const LINK_DISTANCE = NODE_WIDTH;
+    const LINK_STRENGTH = 0.1;
+    const CHARGE_STRENGTH = -150;
+    const COLLISION_PADDING = 10;
+    const BOX_FORCE_STRENGTH = 0.05;
+    const SWIMLANE_FORCE_STRENGTH = 0.1;
+    const SIMULATION_ITERATIONS = 300;
+    
+    // Edge and transition parameters
     const TRANSITION_CURVE_FACTOR = 0.5;
+    const EDGE_CONTROL_DISTANCE_MIN = 100;
 
     
     // Main characters for swimlanes
@@ -397,15 +413,15 @@ const LayoutLogic = (() => {
     
         // Create the simulation
         const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(NODE_WIDTH).strength(0.1))
-            .force("charge", d3.forceManyBody().strength(-150)) // Increased repulsion
-            .force("collision", d3.forceCollide().radius(d => Math.sqrt((NODE_WIDTH/2)**2 + (NODE_HEIGHT/2)**2) + 10)) // Diagonal radius of rectangle + padding
-            .force("boxX", d3.forceX(d => d.box.x + d.box.width / 2).strength(0.05))
-            .force("swimlaneY", d3.forceY(d => d.swimlane.y + d.swimlane.height / 2).strength(0.1))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(LINK_DISTANCE).strength(LINK_STRENGTH))
+            .force("charge", d3.forceManyBody().strength(CHARGE_STRENGTH)) // Node repulsion
+            .force("collision", d3.forceCollide().radius(d => Math.sqrt((NODE_WIDTH/2)**2 + (NODE_HEIGHT/2)**2) + COLLISION_PADDING)) // Diagonal radius of rectangle + padding
+            .force("boxX", d3.forceX(d => d.box.x + d.box.width / 2).strength(BOX_FORCE_STRENGTH))
+            .force("swimlaneY", d3.forceY(d => d.swimlane.y + d.swimlane.height / 2).strength(SWIMLANE_FORCE_STRENGTH))
             .stop();
     
         // Run the simulation for a set number of ticks
-        for (let i = 0; i < 300; i++) {
+        for (let i = 0; i < SIMULATION_ITERATIONS; i++) {
             simulation.tick();
         }
     
@@ -444,74 +460,113 @@ const LayoutLogic = (() => {
             }
         });
         
-        // Group start nodes by target temporal box for better positioning
+        // Group start nodes by their own temporal box (based on their date)
         const startNodesByBox = {};
         
-        // First, analyze and group start nodes by their target temporal box
+        // First, analyze and group start nodes by their own temporal box
         startNodes.forEach(startNode => {
-            const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
+            // Find the temporal box for this start node based on its own date/year
+            const nodeBox = getTemporalBoxForEvent(startNode);
             
-            if (outgoingEdges.length > 0) {
-                const targetEventIds = outgoingEdges.map(edge => edge.target);
-                const targetEvents = data.events.filter(event => targetEventIds.includes(event.id));
+            if (nodeBox) {
+                // Group by box ID
+                const boxId = nodeBox.start + '-' + nodeBox.end;
                 
-                if (targetEvents.length > 0) {
-                    // Find the earliest target event
-                    const earliestTarget = [...targetEvents].sort((a, b) => a.date - b.date)[0];
-                    const targetBox = getTemporalBoxForEvent(earliestTarget);
-                    
-                    if (targetBox) {
-                        // Group by target box ID
-                        const boxId = targetBox.start + '-' + targetBox.end;
-                        if (!startNodesByBox[boxId]) {
-                            startNodesByBox[boxId] = {
-                                box: targetBox,
-                                nodes: []
-                            };
-                        }
-                        startNodesByBox[boxId].nodes.push({
-                            node: startNode,
-                            targetEvent: earliestTarget
-                        });
-                    }
+                if (!startNodesByBox[boxId]) {
+                    startNodesByBox[boxId] = {
+                        box: nodeBox,
+                        nodes: []
+                    };
                 }
+                
+                // Also track outgoing connections for drawing edges
+                const outgoingEdges = data.edges.filter(edge => edge.source === startNode.id);
+                const targetEvents = [];
+                
+                if (outgoingEdges.length > 0) {
+                    const targetEventIds = outgoingEdges.map(edge => edge.target);
+                    targetEvents.push(...data.events.filter(event => targetEventIds.includes(event.id)));
+                }
+                
+                startNodesByBox[boxId].nodes.push({
+                    node: startNode,
+                    targetEvents: targetEvents
+                });
             }
         });
         
-        // Now position start nodes horizontally next to their target boxes
-        Object.keys(startNodesByBox).forEach(boxId => {
+        // Sort temporal boxes by start year to ensure consistent positioning
+        const sortedBoxIds = Object.keys(startNodesByBox).sort((a, b) => {
+            const boxA = startNodesByBox[a].box;
+            const boxB = startNodesByBox[b].box;
+            return boxA.start - boxB.start;
+        });
+        
+        // Track already occupied positions to avoid overlaps
+        const occupiedPositions = new Map(); // Map of "x-coordinate" to true
+        
+        // Position start nodes in two rows - one above and one below their target boxes
+        sortedBoxIds.forEach(boxId => {
             const { box, nodes } = startNodesByBox[boxId];
-            const NODE_MARGIN = 20; // Space between nodes
             
-            // Position nodes in two rows if there are more than 3 nodes
-            const numNodes = nodes.length;
-            const maxNodesPerRow = Math.ceil(numNodes / 2);
+            // Calculate the center of the temporal box for centering nodes
+            const boxCenterX = box.x + (box.width / 2);
             
+            // Split nodes into two groups - top and bottom
+            const topNodes = [];
+            const bottomNodes = [];
+            
+            // Distribute nodes evenly between top and bottom
             nodes.forEach((nodeInfo, i) => {
-                const row = i < maxNodesPerRow ? 0 : 1; // 0 = top row, 1 = bottom row
-                const col = i % maxNodesPerRow;
-                
-                // Position horizontally outside the box
-                const xOffset = box.x - NODE_WIDTH - NODE_MARGIN - (col * (NODE_WIDTH + NODE_MARGIN));
-                
-                // Position either above or below the box depending on row
-                let yPos;
-                if (row === 0) {
-                    // Top row positioned above the box
-                    yPos = box.y - NODE_HEIGHT - NODE_MARGIN;
+                if (i % 2 === 0) {
+                    topNodes.push(nodeInfo);
                 } else {
-                    // Bottom row positioned below the box
-                    yPos = box.y + box.height + NODE_MARGIN;
+                    bottomNodes.push(nodeInfo);
                 }
-                
-                // Store the position
-                nodePositions[nodeInfo.node.id] = {
-                    x: xOffset,
-                    y: yPos,
-                    lane: 'start',
-                    timeRange: null
-                };
             });
+            
+            // Position top row nodes (above the box)
+            if (topNodes.length > 0) {
+                const topY = box.y - NODE_HEIGHT - START_NODE_BOX_SPACING;
+                const topTotalWidth = topNodes.length * NODE_WIDTH + (topNodes.length - 1) * START_NODE_SPACING;
+                let topStartX = boxCenterX - (topTotalWidth / 2);
+                
+                // Adjust if nodes would extend before the box's left edge
+                topStartX = Math.max(topStartX, box.x);
+                
+                topNodes.forEach((nodeInfo, i) => {
+                    const xPos = topStartX + (i * (NODE_WIDTH + START_NODE_SPACING));
+                    
+                    nodePositions[nodeInfo.node.id] = {
+                        x: xPos,
+                        y: topY,
+                        lane: 'start',
+                        timeRange: null
+                    };
+                });
+            }
+            
+            // Position bottom row nodes (below the box)
+            if (bottomNodes.length > 0) {
+                // Increase spacing for bottom nodes to prevent overlap
+                const bottomY = box.y + box.height + START_NODE_BOX_SPACING * 2.5;
+                const bottomTotalWidth = bottomNodes.length * NODE_WIDTH + (bottomNodes.length - 1) * START_NODE_SPACING;
+                let bottomStartX = boxCenterX - (bottomTotalWidth / 2);
+                
+                // Adjust if nodes would extend before the box's left edge
+                bottomStartX = Math.max(bottomStartX, box.x);
+                
+                bottomNodes.forEach((nodeInfo, i) => {
+                    const xPos = bottomStartX + (i * (NODE_WIDTH + START_NODE_SPACING));
+                    
+                    nodePositions[nodeInfo.node.id] = {
+                        x: xPos,
+                        y: bottomY,
+                        lane: 'start',
+                        timeRange: null
+                    };
+                });
+            }
         });
     };
     
@@ -572,7 +627,7 @@ const LayoutLogic = (() => {
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         // Adjust control points based on distance
-        const controlDistance = Math.min(100, distance / 3);
+        const controlDistance = Math.min(EDGE_CONTROL_DISTANCE_MIN, distance / 3);
         
         // Calculate control points
         const angle = Math.atan2(dy, dx);
