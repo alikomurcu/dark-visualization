@@ -67,43 +67,23 @@ const DataParser = (() => {
             console.log("Number of all edges:", all_edges.length);
             console.log("Number of edges after filter:", edges.length);
 
-
-            let addedEventsCount = 0;
+            // Remove the isolated nodes
+            let removedEdgesCount = 0;
             // for each event in events, check if each edge has a source or target that is in the events
             events.forEach(event => {
                 const edges1 = edges.filter(edge => edge.source === event.id || edge.target === event.id);
                 // if edge is empty print the event
                 if (edges1.length === 0) {
-                    // add the adjacent events of this event to events
-                    const adjacentEdges = all_edges.filter(edge => edge.source === event.id || edge.target === event.id);
-                    adjacentEdges.forEach(adjacentEdge => {
-                        // Add edge if not already present
-                        if (!edges.some(e => e.id === adjacentEdge.id)) {
-                            edges.push(adjacentEdge);
-                        }
-                        
-                        // Add source event if not already present
-                        const sourceEvent = all_events.find(e => e.id === adjacentEdge.source);
-                        if (sourceEvent && !events.some(e => e.id === sourceEvent.id)) {
-                            events.push(sourceEvent);
-                            addedEventsCount++;
-                        }
-                        
-                        // Add target event if not already present
-                        const targetEvent = all_events.find(e => e.id === adjacentEdge.target);
-                        if (targetEvent && !events.some(e => e.id === targetEvent.id)) {
-                            events.push(targetEvent);
-                            addedEventsCount++;
-                        }
-                    });
+                    // console.log("event", event);
+                    // remove the event from the events
+                    events = events.filter(e => e.id !== event.id);
+                    removedEdgesCount++;
                 }
             });
 
-            console.log("The number added events to isolated ones", addedEventsCount);
-
-            console.log("length of events after adding adjacents isolated nodes", events.length);
-            console.log("length of edges after adding adjacents isolated nodes", edges.length);
-        
+            console.log("The number of isolated nodes (no edges), removed", removedEdgesCount);
+            console.log("length of events after removing isolated nodes", events.length);
+            console.log("length of edges after adding adjacents isolated nodes", edges.length);        
             
 
             // Identify start nodes (nodes with no incoming edges)
