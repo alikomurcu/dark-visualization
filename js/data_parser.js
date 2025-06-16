@@ -5,6 +5,8 @@
 
 const DataParser = (() => {
     // Private variables
+    let all_events = [];
+    let all_edges = [];
     let events = [];
     let edges = [];
     let timeRanges = [];
@@ -27,7 +29,7 @@ const DataParser = (() => {
             d3.csv('data/Dark_Edges.csv')
         ]).then(([eventsData, edgesData]) => {
             // Process events data
-            events = eventsData.map(event => ({
+            all_events = eventsData.map(event => ({
                 id: +event.ID,
                 description: event.Description,
                 date: parseDate(event.Date),
@@ -39,14 +41,18 @@ const DataParser = (() => {
                 isRomantic: isRomantic(event.Description) || isRomantic(event.Characters),
                 isMissing: isMissingPerson(event.Description) || isMissingPerson(event.Characters),
                 isTimeTravel: isTimeTravelEvent(event.Description) || isTimeTravelEvent(event.Characters)
-            })).filter(event => event.importantTrigger || event.death || event.isRomantic || event.isMissing || event.isTimeTravel);
+            }));
 
-            console.log("Number of events:", events.length);
+            events = all_events.filter(event => event.importantTrigger || event.death || event.isRomantic || event.isMissing || event.isTimeTravel);
+
+            console.log("Number of all events:", all_events.length);
+            console.log("Number of events after filter:", events.length);
             // Get set of important event IDs for edge filtering
+            const all_eventIds = new Set(all_events.map(event => event.id));
             const eventIds = new Set(events.map(event => event.id));
 
             // Process edges data - only keep edges between important events
-            edges = edgesData
+            all_edges = edgesData
                 .filter(edge => edge.Source && edge.Target)
                 .map(edge => ({
                     id: +edge.ID,
@@ -54,12 +60,52 @@ const DataParser = (() => {
                     target: +edge.Target,
                     type: edge.Type,
                     description: edge.Description
-                }))
-                .filter(edge => 
-                    eventIds.has(edge.source) && 
-                    eventIds.has(edge.target)
-                );
+                }));
+            edges = all_edges.filter(edge => eventIds.has(edge.source) && eventIds.has(edge.target));
+            all_edges = all_edges.filter(edge => all_eventIds.has(edge.source) && all_eventIds.has(edge.target));
+
+            console.log("Number of all edges:", all_edges.length);
+            console.log("Number of edges after filter:", edges.length);
+
+
+            let addedEventsCount = 0;
+            // for each event in events, check if each edge has a source or target that is in the events
+            events.forEach(event => {
+                const edges1 = edges.filter(edge => edge.source === event.id || edge.target === event.id);
+                // if edge is empty print the event
+                if (edges1.length === 0) {
+                    // add the adjacent events of this event to events
+                    const adjacentEdges = all_edges.filter(edge => edge.source === event.id || edge.target === event.id);
+                    adjacentEdges.forEach(adjacentEdge => {
+                        // Add edge if not already present
+                        if (!edges.some(e => e.id === adjacentEdge.id)) {
+                            edges.push(adjacentEdge);
+                        }
+                        
+                        // Add source event if not already present
+                        const sourceEvent = all_events.find(e => e.id === adjacentEdge.source);
+                        if (sourceEvent && !events.some(e => e.id === sourceEvent.id)) {
+                            events.push(sourceEvent);
+                            addedEventsCount++;
+                        }
+                        
+                        // Add target event if not already present
+                        const targetEvent = all_events.find(e => e.id === adjacentEdge.target);
+                        if (targetEvent && !events.some(e => e.id === targetEvent.id)) {
+                            events.push(targetEvent);
+                            addedEventsCount++;
+                        }
+                    });
+                }
+            });
+
+            console.log("The number added events to isolated ones", addedEventsCount);
+
+            console.log("length of events after adding adjacents isolated nodes", events.length);
+            console.log("length of edges after adding adjacents isolated nodes", edges.length);
+        
             
+
             // Identify start nodes (nodes with no incoming edges)
             const targetNodeIds = new Set(edges.map(edge => edge.target));
             startNodes = events.filter(event => !targetNodeIds.has(event.id));
