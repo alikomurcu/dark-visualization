@@ -72,6 +72,8 @@ const Visualization = (() => {
                 render();
             }
         });
+        d3.select('#save-json').on('click', saveLayoutJson);
+        d3.select('#load-json').on('click', loadLayoutJson);
     };
     
     /**
@@ -486,13 +488,10 @@ const Visualization = (() => {
      * Render edges between nodes with improved edge bundling
      */
     const renderEdges = () => {
-        // Remove old edges group before drawing new ones
         zoomGroup.selectAll('.edges').remove();
         const edgesGroup = zoomGroup.append('g').attr('class', 'edges');
-        // Remove old time travel edges
         zoomGroup.selectAll('.timetravel-edges').remove();
         zoomGroup.append('g').attr('class', 'timetravel-edges');
-        // For each edge, draw with custom controls if present
         data.edges.forEach(edge => {
             const sourcePos = layout.nodePositions[edge.source];
             const targetPos = layout.nodePositions[edge.target];
@@ -509,88 +508,72 @@ const Visualization = (() => {
                     timeTravelDirection = sourceDate < targetDate ? 'future' : 'past';
                 }
             }
-            let pathData;
-            let strokeColor = 'white';
             let edgeKey = getEdgeKey(edge.source, edge.target);
-            let edgeType = 'other';
-            // Quadratic (same box, same lane)
-            if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
-                edgeType = 'quadratic';
-                let midX = (sourcePos.x + targetPos.x) / 2;
-                let curveHeight = 30;
-                const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
-                if (verticalDistance < 40) {
-                    curveHeight = Math.max(15, verticalDistance * 0.5);
-                }
-                let controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
-                if (customEdgeControls[edgeKey]) {
-                    midX = customEdgeControls[edgeKey].x;
-                    controlY = customEdgeControls[edgeKey].y;
-                }
-                pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${controlY} ${targetPos.x} ${targetPos.y}`;
-                if (sourcePos.lane === 'jonas') strokeColor = 'blue';
-                else if (sourcePos.lane === 'martha') strokeColor = 'green';
-                else if (sourcePos.lane === 'other') strokeColor = 'yellow';
-            }
-            // Cubic (same box, different lane)
-            else if (sourcePos.timeRange === targetPos.timeRange) {
-                edgeType = 'cubic';
-                const dx = targetPos.x - sourcePos.x;
-                const dy = targetPos.y - sourcePos.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
-                let cp1x = sourcePos.x + dx * 0.25;
-                let cp1y = sourcePos.y - distance * curveStrength;
-                let cp2x = sourcePos.x + dx * 0.75;
-                let cp2y = targetPos.y - distance * curveStrength;
-                if (customEdgeControls[edgeKey]) {
-                    cp1x = customEdgeControls[edgeKey].cp1x;
-                    cp1y = customEdgeControls[edgeKey].cp1y;
-                    cp2x = customEdgeControls[edgeKey].cp2x;
-                    cp2y = customEdgeControls[edgeKey].cp2y;
-                }
-                pathData = `M ${sourcePos.x} ${sourcePos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPos.x} ${targetPos.y}`;
-                if (sourcePos.lane === 'jonas') strokeColor = 'blue';
-                else if (sourcePos.lane === 'martha') strokeColor = 'green';
-                else if (sourcePos.lane === 'other') strokeColor = 'yellow';
-            }
-            // Bundled/complex (different box)
-            else {
-                edgeType = 'bundled';
-                const dx = targetPos.x - sourcePos.x;
-                const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
-                const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
-                const sourceBox = layout.temporalBoxes[sourceBoxIndex];
-                const targetBox = layout.temporalBoxes[targetBoxIndex];
-                let useSimpleCurve = false;
-                if (!sourceBox || !targetBox) useSimpleCurve = true;
-                if (useSimpleCurve) {
-                    let midX = (sourcePos.x + targetPos.x) / 2;
-                    let midY = (sourcePos.y + targetPos.y) / 2;
-                    let controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
-                    if (customEdgeControls[edgeKey]) {
-                        midX = customEdgeControls[edgeKey].x;
-                        midY = customEdgeControls[edgeKey].y;
-                    }
-                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY - controlOffset} ${targetPos.x} ${targetPos.y}`;
-                } else {
-                    let midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
-                    const verticalChannelSize = 250;
-                    const avgY = (sourcePos.y + targetPos.y) / 2;
-                    let channelCenterY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
-                    let controlY = channelCenterY;
-                    if (customEdgeControls[edgeKey]) {
-                        midX = customEdgeControls[edgeKey].x;
-                        controlY = customEdgeControls[edgeKey].y;
-                    }
-                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ${midX - 120} ${controlY}, ${midX} ${controlY} S ${midX + 120} ${controlY}, ${targetPos.x - dx * 0.15} ${targetPos.y}, ${targetPos.x} ${targetPos.y}`;
-                }
-                strokeColor = 'white';
-            }
             let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : (isSummarized ? 'summarized-edge' : 'edge');
-            let edgeColor = strokeColor;
+            // Restore original coloring logic
+            let edgeColor = 'white';
             if (isTimeTravelEdge) {
                 edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
+            } else if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
+                if (sourcePos.lane === 'jonas') edgeColor = 'blue';
+                else if (sourcePos.lane === 'martha') edgeColor = 'green';
+                else if (sourcePos.lane === 'other') edgeColor = 'yellow';
+            } else if (sourcePos.timeRange === targetPos.timeRange) {
+                if (sourcePos.lane === 'jonas') edgeColor = 'blue';
+                else if (sourcePos.lane === 'martha') edgeColor = 'green';
+                else if (sourcePos.lane === 'other') edgeColor = 'yellow';
+            } // else keep white for bundled/complex
+            // Use custom control points if present
+            let pathData = '';
+            if (customEdgeControls[edgeKey] && customEdgeControls[edgeKey].length > 0) {
+                const points = [
+                    [sourcePos.x, sourcePos.y],
+                    ...customEdgeControls[edgeKey].map(pt => [pt.x, pt.y]),
+                    [targetPos.x, targetPos.y]
+                ];
+                pathData = d3.line().curve(d3.curveCatmullRom.alpha(0.5))(points);
+            } else {
+                if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
+                    let midX = (sourcePos.x + targetPos.x) / 2;
+                    let curveHeight = 30;
+                    const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
+                    if (verticalDistance < 40) {
+                        curveHeight = Math.max(15, verticalDistance * 0.5);
+                    }
+                    let controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${controlY} ${targetPos.x} ${targetPos.y}`;
+                } else if (sourcePos.timeRange === targetPos.timeRange) {
+                    const dx = targetPos.x - sourcePos.x;
+                    const dy = targetPos.y - sourcePos.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
+                    const cp1x = sourcePos.x + dx * 0.25;
+                    const cp1y = sourcePos.y - distance * curveStrength;
+                    const cp2x = sourcePos.x + dx * 0.75;
+                    const cp2y = targetPos.y - distance * curveStrength;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPos.x} ${targetPos.y}`;
+                } else {
+                    const dx = targetPos.x - sourcePos.x;
+                    const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
+                    const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
+                    const sourceBox = layout.temporalBoxes[sourceBoxIndex];
+                    const targetBox = layout.temporalBoxes[targetBoxIndex];
+                    let useSimpleCurve = false;
+                    if (!sourceBox || !targetBox) useSimpleCurve = true;
+                    if (useSimpleCurve) {
+                        let midX = (sourcePos.x + targetPos.x) / 2;
+                        let midY = (sourcePos.y + targetPos.y) / 2;
+                        let controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
+                        pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY - controlOffset} ${targetPos.x} ${targetPos.y}`;
+                    } else {
+                        let midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
+                        const verticalChannelSize = 250;
+                        const avgY = (sourcePos.y + targetPos.y) / 2;
+                        let channelCenterY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
+                        let controlY = channelCenterY;
+                        pathData = `M ${sourcePos.x} ${sourcePos.y} C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ${midX - 120} ${controlY}, ${midX} ${controlY} S ${midX + 120} ${controlY}, ${targetPos.x - dx * 0.15} ${targetPos.y}, ${targetPos.x} ${targetPos.y}`;
+                    }
+                }
             }
             const targetGroup = isTimeTravelEdge ?
                 (zoomGroup.select('.timetravel-edges').size() ? zoomGroup.select('.timetravel-edges') : zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges')) :
@@ -613,6 +596,12 @@ const Visualization = (() => {
                 .on('click', function(event) {
                     event.stopPropagation();
                     selectedEdgeKey = edgeKey;
+                    // Add a control point at the click position
+                    if (!customEdgeControls[edgeKey]) customEdgeControls[edgeKey] = [];
+                    // Get click position in SVG coordinates
+                    const pt = d3.pointer(event, zoomGroup.node());
+                    customEdgeControls[edgeKey].push({ x: pt[0], y: pt[1] });
+                    saveEdgeControls();
                     render();
                 });
         });
@@ -1132,38 +1121,22 @@ const Visualization = (() => {
         zoomGroup.selectAll('.edge-control').remove();
         zoomGroup.selectAll('.edge-control-hit').remove();
         if (!selectedEdgeKey) return;
-        // Find the selected edge
         const edge = data.edges.find(e => getEdgeKey(e.source, e.target) === selectedEdgeKey);
         if (!edge) return;
-        const sourcePos = layout.nodePositions[edge.source];
-        const targetPos = layout.nodePositions[edge.target];
-        if (!sourcePos || !targetPos) return;
-        // Quadratic (same box, same lane)
-        if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
-            let midX = (sourcePos.x + targetPos.x) / 2;
-            let curveHeight = 30;
-            const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
-            if (verticalDistance < 40) {
-                curveHeight = Math.max(15, verticalDistance * 0.5);
-            }
-            let controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
-            if (customEdgeControls[selectedEdgeKey]) {
-                midX = customEdgeControls[selectedEdgeKey].x;
-                controlY = customEdgeControls[selectedEdgeKey].y;
-            }
-            // Draw a large transparent hit area for easier interaction
+        const edgeKey = getEdgeKey(edge.source, edge.target);
+        if (!customEdgeControls[edgeKey] || customEdgeControls[edgeKey].length === 0) return;
+        customEdgeControls[edgeKey].forEach((pt, idx) => {
             zoomGroup.append('circle')
                 .attr('class', 'edge-control-hit')
-                .attr('cx', midX)
-                .attr('cy', controlY)
+                .attr('cx', pt.x)
+                .attr('cy', pt.y)
                 .attr('r', 18)
                 .attr('fill', 'transparent')
                 .style('pointer-events', 'all');
-            // Draw the visible handle at the actual control point
             zoomGroup.append('circle')
                 .attr('class', 'edge-control')
-                .attr('cx', midX)
-                .attr('cy', controlY)
+                .attr('cx', pt.x)
+                .attr('cy', pt.y)
                 .attr('r', 10)
                 .attr('fill', '#ff9800')
                 .attr('stroke', '#fff')
@@ -1172,148 +1145,73 @@ const Visualization = (() => {
                 .call(d3.drag()
                     .on('start', function() { d3.select(this).raise(); })
                     .on('drag', function(event) {
-                        customEdgeControls[selectedEdgeKey] = { x: event.x, y: event.y };
+                        customEdgeControls[edgeKey][idx] = { x: event.x, y: event.y };
                         saveEdgeControls();
                         render();
                     })
                 );
-        }
-        // Cubic (same box, different lane)
-        else if (sourcePos.timeRange === targetPos.timeRange) {
-            const dx = targetPos.x - sourcePos.x;
-            const dy = targetPos.y - sourcePos.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
-            let cp1x = sourcePos.x + dx * 0.25;
-            let cp1y = sourcePos.y - distance * curveStrength;
-            let cp2x = sourcePos.x + dx * 0.75;
-            let cp2y = targetPos.y - distance * curveStrength;
-            if (customEdgeControls[selectedEdgeKey]) {
-                cp1x = customEdgeControls[selectedEdgeKey].cp1x;
-                cp1y = customEdgeControls[selectedEdgeKey].cp1y;
-                cp2x = customEdgeControls[selectedEdgeKey].cp2x;
-                cp2y = customEdgeControls[selectedEdgeKey].cp2y;
-            }
-            // Draw two draggable handles at the actual control points
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control-hit')
-                .attr('cx', cp1x)
-                .attr('cy', cp1y)
-                .attr('r', 18)
-                .attr('fill', 'transparent')
-                .style('pointer-events', 'all');
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control')
-                .attr('cx', cp1x)
-                .attr('cy', cp1y)
-                .attr('r', 10)
-                .attr('fill', '#ff9800')
-                .attr('stroke', '#fff')
-                .attr('stroke-width', 2)
-                .attr('cursor', 'pointer')
-                .call(d3.drag()
-                    .on('start', function() { d3.select(this).raise(); })
-                    .on('drag', function(event) {
-                        customEdgeControls[selectedEdgeKey] = customEdgeControls[selectedEdgeKey] || {};
-                        customEdgeControls[selectedEdgeKey].cp1x = event.x;
-                        customEdgeControls[selectedEdgeKey].cp1y = event.y;
-                        // Keep cp2 as is
-                        if (!('cp2x' in customEdgeControls[selectedEdgeKey])) {
-                            customEdgeControls[selectedEdgeKey].cp2x = cp2x;
-                            customEdgeControls[selectedEdgeKey].cp2y = cp2y;
-                        }
-                        saveEdgeControls();
-                        render();
-                    })
-                );
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control-hit')
-                .attr('cx', cp2x)
-                .attr('cy', cp2y)
-                .attr('r', 18)
-                .attr('fill', 'transparent')
-                .style('pointer-events', 'all');
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control')
-                .attr('cx', cp2x)
-                .attr('cy', cp2y)
-                .attr('r', 10)
-                .attr('fill', '#ff9800')
-                .attr('stroke', '#fff')
-                .attr('stroke-width', 2)
-                .attr('cursor', 'pointer')
-                .call(d3.drag()
-                    .on('start', function() { d3.select(this).raise(); })
-                    .on('drag', function(event) {
-                        customEdgeControls[selectedEdgeKey] = customEdgeControls[selectedEdgeKey] || {};
-                        customEdgeControls[selectedEdgeKey].cp2x = event.x;
-                        customEdgeControls[selectedEdgeKey].cp2y = event.y;
-                        // Keep cp1 as is
-                        if (!('cp1x' in customEdgeControls[selectedEdgeKey])) {
-                            customEdgeControls[selectedEdgeKey].cp1x = cp1x;
-                            customEdgeControls[selectedEdgeKey].cp1y = cp1y;
-                        }
-                        saveEdgeControls();
-                        render();
-                    })
-                );
-        }
-        // Bundled/complex (different box)
-        else {
-            const dx = targetPos.x - sourcePos.x;
-            const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
-            const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
-            const sourceBox = layout.temporalBoxes[sourceBoxIndex];
-            const targetBox = layout.temporalBoxes[targetBoxIndex];
-            let useSimpleCurve = false;
-            if (!sourceBox || !targetBox) useSimpleCurve = true;
-            let midX, controlY;
-            if (useSimpleCurve) {
-                midX = (sourcePos.x + targetPos.x) / 2;
-                let midY = (sourcePos.y + targetPos.y) / 2;
-                let controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
-                controlY = midY - controlOffset;
-                if (customEdgeControls[selectedEdgeKey]) {
-                    midX = customEdgeControls[selectedEdgeKey].x;
-                    controlY = customEdgeControls[selectedEdgeKey].y;
-                }
-            } else {
-                midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
-                const verticalChannelSize = 250;
-                const avgY = (sourcePos.y + targetPos.y) / 2;
-                controlY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
-                if (customEdgeControls[selectedEdgeKey]) {
-                    midX = customEdgeControls[selectedEdgeKey].x;
-                    controlY = customEdgeControls[selectedEdgeKey].y;
-                }
-            }
-            // Draw a large transparent hit area for easier interaction
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control-hit')
-                .attr('cx', midX)
-                .attr('cy', controlY)
-                .attr('r', 18)
-                .attr('fill', 'transparent')
-                .style('pointer-events', 'all');
-            zoomGroup.append('circle')
-                .attr('class', 'edge-control')
-                .attr('cx', midX)
-                .attr('cy', controlY)
-                .attr('r', 10)
-                .attr('fill', '#ff9800')
-                .attr('stroke', '#fff')
-                .attr('stroke-width', 2)
-                .attr('cursor', 'pointer')
-                .call(d3.drag()
-                    .on('start', function() { d3.select(this).raise(); })
-                    .on('drag', function(event) {
-                        customEdgeControls[selectedEdgeKey] = { x: event.x, y: event.y };
-                        saveEdgeControls();
-                        render();
-                    })
-                );
-        }
+        });
     };
+
+    // Save current node and edge positions to a JSON file
+    function saveLayoutJson() {
+        const dataToSave = {
+            nodePositions: layout.nodePositions,
+            edgeControls: customEdgeControls
+        };
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'layout.json';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    // Load node and edge positions from a JSON file
+    function loadLayoutJson() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                try {
+                    const json = JSON.parse(evt.target.result);
+                    // Reset nodes and edge controls
+                    localStorage.removeItem('dark-graph-node-positions');
+                    resetEdgeControls();
+                    layout = LayoutLogic.calculateLayout(data);
+                    // Apply loaded node positions
+                    if (json.nodePositions) {
+                        Object.keys(json.nodePositions).forEach(id => {
+                            if (layout.nodePositions[id]) {
+                                layout.nodePositions[id].x = json.nodePositions[id].x;
+                                layout.nodePositions[id].y = json.nodePositions[id].y;
+                            }
+                        });
+                    }
+                    // Apply loaded edge controls
+                    if (json.edgeControls) {
+                        customEdgeControls = json.edgeControls;
+                    }
+                    saveNodePositions();
+                    saveEdgeControls();
+                    render();
+                } catch (err) {
+                    alert('Invalid JSON file.');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
 
     // Public API
     return {
