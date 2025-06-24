@@ -1,16 +1,25 @@
 /* Dark Series Visualization Styles */
 
 :root {
-    --dark-bg: #121212;
-    --dark-secondary: #1e1e1e;
-    --text-primary: #f5f5f5;
-    --text-secondary: #aaaaaa;
-    --accent-color: #ffd700;
-    --jonas-color: #7bc0ee;
-    --martha-color: #e74c3c;
-    --other-color: #2ecc71;
-    --important-color: #ffd700;
-    --death-color: #8e44ad;
+    /* Backgrounds */
+    --dark-bg: #1a1a2e;              /* Deep midnight blue */
+    --dark-secondary: #16213e;       /* Rich navy-blue for surfaces */
+
+    /* Typography */
+    --text-primary: #ffffff;         /* Crisp white for maximum contrast */
+    --text-secondary: #b8b8d1;       /* Muted lavender-gray for secondary text */
+
+    /* Accent / UI Highlights */
+    --accent-color: #ffac33;         /* Vibrant orange-gold (sun energy) */
+    --important-color: #ffd700;      /* Strong yellow for key highlights */
+
+    /* Thematic Character Colors (Vibrant) */
+    --jonas-color: #00d9ff;          /* Bright cyan â€“ energetic and clean */
+    --martha-color: #ff3cac;         /* Vivid pink-magenta â€“ passionate and strong */
+    --death-color: #c92eff;          /* Neon violet â€“ mysterious and attention-grabbing */
+
+    /* Extras */
+    --other-color: #0f0f1c;          /* Near-black with subtle warmth for depth layers */
 }
 
 * {
@@ -19,24 +28,54 @@
     box-sizing: border-box;
 }
 
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+:root {
+    --dark-bg: #1e1e2f;
+    --text-primary: #f1f1f1;
+}
+
 body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Poppins', sans-serif;
     background-color: var(--dark-bg);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.8;
+    margin: 0;
+    padding: 0;
+    font-size: 23px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .container {
-    max-width: 100%;
-    padding: 20px;
+    max-width: 112%;
+    padding: 22px;
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
     flex-wrap: wrap;
+    gap: 16px;
+    padding: 20px 32px;
+    background: linear-gradient(135deg, var(--dark-secondary), #1f2a38);
+    color: var(--text-primary);
+    border-radius: 16px;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.25),
+        inset 0 0 8px rgba(255, 255, 255, 0.05);
+    margin-bottom: 32px;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+}
+
+header:hover {
+    background: linear-gradient(135deg, #334e68, #1b263b);
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.35),
+        inset 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
 h1 {
@@ -53,39 +92,51 @@ h1 {
 
 .download-buttons {
     display: flex;
-    gap: 10px;
+    gap: 12px;
 }
 
 .download-buttons button {
-    background-color: var(--dark-secondary);
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--text-primary);
-    border: 1px solid var(--text-secondary);
-    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    font-size: 12px;
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
-.download-buttons button:hover {
-    background-color: var(--accent-color);
+/* Button 1 - Blue Gradient */
+.download-buttons button:nth-child(1) {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+}
+
+.download-buttons button:nth-child(1):hover {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
     color: var(--dark-bg);
 }
 
-button {
-    background-color: var(--dark-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--text-secondary);
-    padding: 8px 12px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.3s ease;
+/* Button 2 - Green Gradient */
+.download-buttons button:nth-child(2) {
+    background: linear-gradient(135deg, #10b981, #34d399);
 }
 
-button:hover {
-    background-color: var(--accent-color);
+.download-buttons button:nth-child(2):hover {
+    background: linear-gradient(135deg, #34d399, #10b981);
     color: var(--dark-bg);
 }
+
+/* Button 3 - Orange Gradient */
+.download-buttons button:nth-child(3) {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+.download-buttons button:nth-child(3):hover {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: var(--dark-bg);
+}
+
 
 .legend {
     display: flex;
@@ -96,14 +147,14 @@ button:hover {
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 12px;
+    gap: 6px;
+    font-size: 13px;
 }
 
 .legend-symbol {
     width: 15px;
     height: 15px;
-    border-radius: 50%;
+    border-radius: 53%;
     background-color: var(--text-primary);
 }
 
@@ -170,27 +221,61 @@ button:hover {
 .time-travel-edge-legend {
     width: 15px;
     height: 4px;
-    border-radius: 0;
-    background-color: #64b5f6; /* Light blue */
-    box-shadow: 0 0 5px 1px rgba(100, 181, 246, 0.8), 0 0 8px 1px rgba(100, 181, 246, 0.6);
+    border-radius: 0; /* sharp edges as requested */
+    background: linear-gradient(90deg, #64b5f6, #4fc3f7);
+    box-shadow:
+        0 0 5px 1px rgba(100, 181, 246, 0.8),
+        0 0 8px 1px rgba(100, 181, 246, 0.6);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.time-travel-edge-legend:hover {
+    transform: scale(1.1);
+    box-shadow:
+        0 0 10px 2px rgba(100, 181, 246, 0.9),
+        0 0 15px 3px rgba(100, 181, 246, 0.7);
 }
 
 #visualization-container {
     width: 100%;
     height: 80vh;
-    overflow: auto; /* Enable scrolling for large visualization */
+    overflow: auto;
     background-color: var(--dark-secondary);
-    border-radius: 4px;
+    border-radius: 12px;
     position: relative;
-    /* Scrollbar styling */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     scrollbar-width: thin;
-    scrollbar-color: var(--dark-secondary) var(--text-secondary);
+    scrollbar-color: var(--accent-color) var(--dark-secondary);
 }
+
+/* Webkit browsers scrollbar */
+#visualization-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#visualization-container::-webkit-scrollbar-track {
+    background: var(--dark-secondary);
+    border-radius: 12px;
+}
+
+#visualization-container::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+    border-radius: 12px;
+    box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.3);
+    transition: background-color 0.3s ease;
+}
+
+#visualization-container::-webkit-scrollbar-thumb:hover {
+    background: #ffdb4d; /* Slightly lighter accent on hover */
+}
+
+
 
 /* For WebKit browsers (Chrome, Safari) */
 #visualization-container::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 13px;
+    height: 13px;
 }
 
 #visualization-container::-webkit-scrollbar-track {
@@ -260,8 +345,8 @@ button:hover {
 /* Node text styles */
 .node-text {
     font-size: 10px;
-    font-weight: 500;
-    fill: white;
+    font-weight: 600;
+    fill: #f0f0f0; /* off-white for less harshness but good contrast */
     pointer-events: none;
 }
 
@@ -269,30 +354,31 @@ button:hover {
     font-size: 10px;
 }
 
+/* Edges */
 .edge {
-    stroke: rgba(255, 255, 255, 0.7);
-    stroke-width: 1.5px;
+    stroke: rgba(240, 240, 240, 0.85); /* brighter and more opaque */
+    stroke-width: 1.6px;
     fill: none;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
+    opacity: 0.9;
+    transition: opacity 0.3s ease, stroke-width 0.3s ease;
 }
 
 .edge:hover {
     opacity: 1;
-    stroke: rgba(255, 255, 255, 0.9);
-    stroke-width: 2px;
+    stroke: #ffffff; /* pure white on hover for max contrast */
+    stroke-width: 2.4px;
 }
 
 .edge-marker {
-    fill: rgba(255, 255, 255, 0.8);
+    fill: rgba(240, 240, 240, 0.9);
 }
 
 .summarized-edge {
-    stroke: rgba(255, 255, 255, 0.6);
-    stroke-width: 1.5px;
+    stroke: rgba(240, 240, 240, 0.75);
+    stroke-width: 1.6px;
     stroke-dasharray: 4,3;
     fill: none;
-    opacity: 0.7;
+    opacity: 0.85;
 }
 
 /* Time Travel Edges */
