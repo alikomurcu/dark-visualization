@@ -121,39 +121,50 @@ const DataParser = (() => {
      * @returns {Array} Array of time range objects
      */
     const determineTimeRanges = () => {
-        // Get all unique years from events
-        const years = [...new Set(events.map(event => event.year))];
-        years.sort((a, b) => a - b);
-        
-        // Group years into ranges based on proximity
-        const ranges = [];
-        let currentRange = [years[0]];
-        
-        for (let i = 1; i < years.length; i++) {
-            const gap = years[i] - years[i-1];
+        // // Get all unique years from events
+        // const years = [...new Set(events.map(event => event.year))];
+        // years.sort((a, b) => a - b);
+        // 
+        // // Group years into ranges based on proximity
+        // const ranges = [];
+        // let currentRange = [years[0]];
+        // 
+        // for (let i = 1; i < years.length; i++) {
+        //     const gap = years[i] - years[i-1];
+        //     
+        //     // If gap is small or there are many events in these years, keep in same range
+        //     if (gap <= 5) {
+        //         currentRange.push(years[i]);
+        //     } else {
+        //         // Start a new range
+        //         ranges.push({
+        //             start: Math.min(...currentRange),
+        //             end: Math.max(...currentRange),
+        //             years: [...currentRange]
+        //         });
+        //         currentRange = [years[i]];
+        //     }
+        // }
+        // 
+        // // Add the last range
+        // if (currentRange.length > 0) {
+        //     ranges.push({
+        //         start: Math.min(...currentRange),
+        //         end: Math.max(...currentRange),
+        //         years: [...currentRange]
+        //     });
+        // }
+
+        const ranges = [
+            { start: 1888, end: 1890 },
+            { start: 1911, end: 1921 },
+            { start: 1953, end: 1971 },
+            { start: 1986, end: 1987 },
+            { start: 2019, end: 2020 },
+            { start: 2052, end: 2053 }
             
-            // If gap is small or there are many events in these years, keep in same range
-            if (gap <= 5) {
-                currentRange.push(years[i]);
-            } else {
-                // Start a new range
-                ranges.push({
-                    start: Math.min(...currentRange),
-                    end: Math.max(...currentRange),
-                    years: [...currentRange]
-                });
-                currentRange = [years[i]];
-            }
-        }
-        
-        // Add the last range
-        if (currentRange.length > 0) {
-            ranges.push({
-                start: Math.min(...currentRange),
-                end: Math.max(...currentRange),
-                years: [...currentRange]
-            });
-        }
+        ];
+
         
         // Calculate event counts for each range
         ranges.forEach(range => {
