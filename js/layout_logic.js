@@ -12,6 +12,7 @@ const LayoutLogic = (() => {
 
 
     // Constants for layout dimensions
+    const LEGEND_WIDTH = 650; // Space for the legend image (600px width + 50px padding)
     const MARGIN = { top: FIXED_HEIGHT*0.08, right: FIXED_WIDTH*0.03, bottom: FIXED_HEIGHT*0.08, left: FIXED_WIDTH*0.03 };
     const BOX_SPACING = FIXED_WIDTH*0.025; // Increased spacing between temporal boxes
     const BOX_MIN_WIDTH = FIXED_WIDTH*0.028; // Much wider minimum box width to utilize full graph width

@@ -96,9 +96,8 @@ const Visualization = (() => {
         renderNodes();
         renderCharacterImages(); // Add character images
         
-        // Render the legend at the end to ensure it's on top
-        // Call the external legend function from legend.js
-        renderGraphLegend(zoomGroup, layout, LayoutLogic);
+        // Render the static legend image, which is not part of the zoom group
+        renderLegendImage();
         
         // Add zoom behavior after rendering
         //svg.call(zoom);
@@ -623,7 +622,7 @@ const Visualization = (() => {
         
         // Define border colors for event types
         const borderColors = {
-            death: '#8e44ad', // Purple for death events
+            death: '#c92eff', // Purple for death events
             romantic: '#e74c3c', // Red for romantic events
             missing: '#f39c12', // Orange for missing person events
             timeTravel: '#3498db' // Blue for time travel events
@@ -739,62 +738,80 @@ const Visualization = (() => {
             .call(wrap, nodeWidth - 10); // Wrap text with 5px padding on each side
     };
     
-    /**
-     * Helper function to wrap text within a given width
-     * @param {Selection} text - D3 selection of text elements
-     * @param {Number} width - Maximum width for the text
-     */
-    const wrap = (text, width) => {
-        text.each(function() {
-            const text = d3.select(this);
-            const words = text.text().split(/\s+/).reverse();
-            const lineHeight = 1.1; // ems
-            const y = text.attr('y');
-            const dy = parseFloat(text.attr('dy') || 0);
-            
-            let word;
-            let line = [];
-            let lineNumber = 0;
-            let tspan = text.text(null).append('tspan')
-                .attr('x', text.attr('x'))
-                .attr('y', y)
-                .attr('dy', dy + 'em');
-            
-            // Limit to maximum 3 lines
-            const MAX_LINES = 3;
-            
-            while (word = words.pop()) {
-                line.push(word);
-                tspan.text(line.join(' '));
-                
-                if (tspan.node().getComputedTextLength() > width) {
-                    line.pop();
-                    tspan.text(line.join(' '));
-                    line = [word];
-                    
-                    lineNumber++;
-                    if (lineNumber >= MAX_LINES - 1) {
-                        // For the last line, add ellipsis if there are more words
-                        if (words.length > 0) {
-                            line.push('...');
-                            tspan = text.append('tspan')
-                                .attr('x', text.attr('x'))
-                                .attr('y', y)
-                                .attr('dy', lineNumber * lineHeight + dy + 'em')
-                                .text(line.join(' '));
-                            break;
-                        }
-                    }
-                    
-                    tspan = text.append('tspan')
-                        .attr('x', text.attr('x'))
-                        .attr('y', y)
-                        .attr('dy', lineNumber * lineHeight + dy + 'em')
-                        .text(word);
-                }
+/**
+ * Helper function to wrap text within a given width and vertically center it inside its container.
+ * @param {Selection} text - D3 selection of text elements
+ * @param {Number} width - Maximum width for the text
+ */
+const wrap = (text, width) => {
+    const MAX_LINES = 4;
+    const lineHeight = 1.1; // ems
+
+    text.each(function() {
+        const textElement = d3.select(this);
+        // Preserve original attributes
+        const words = textElement.text().split(/\s+/).reverse();
+        const x = textElement.attr('x');
+        const y = textElement.attr('y');
+        const dy = parseFloat(textElement.attr('dy') || 0);
+
+        // --- 1. Pre-computation Pass: Determine all lines needed without rendering ---
+        const allLines = [];
+        let currentLine = [];
+        let word;
+
+        // Create a temporary, non-rendered tspan for measurement
+        const tempTspan = textElement.text(null).append('tspan');
+
+        while (word = words.pop()) {
+            currentLine.push(word);
+            tempTspan.text(currentLine.join(' '));
+            // When the line exceeds the width, finalize the previous line
+            if (tempTspan.node().getComputedTextLength() > width && currentLine.length > 1) {
+                currentLine.pop(); // Remove the word that broke the limit
+                allLines.push(currentLine.join(' '));
+                currentLine = [word]; // Start a new line
             }
+        }
+        allLines.push(currentLine.join(' ')); // Add the last line
+        tempTspan.remove(); // Clean up the temporary element
+
+        // --- 2. Ellipsis Pass: Truncate lines and add '...' if necessary ---
+        let finalLines = allLines;
+        if (allLines.length > MAX_LINES) {
+            finalLines = allLines.slice(0, MAX_LINES);
+            let lastLine = finalLines[MAX_LINES - 1];
+            
+            const ellipsisTspan = textElement.append('tspan');
+            // Shorten the last line until it fits with the ellipsis
+            while (lastLine.length > 0) {
+                ellipsisTspan.text(lastLine + '...');
+                if (ellipsisTspan.node().getComputedTextLength() <= width) {
+                    break; // It fits
+                }
+                lastLine = lastLine.slice(0, -1); // Shorten and try again
+            }
+            finalLines[MAX_LINES - 1] = lastLine + '...';
+            ellipsisTspan.remove(); // Clean up
+        }
+
+        // --- 3. Rendering Pass: Calculate vertical offset and create final tspans ---
+        const numLines = finalLines.length;
+        // Calculate the starting offset to shift the entire text block upwards
+        // so that its center aligns with the original 'y' position.
+        const startDy = dy - ((numLines - 1) / 2) * lineHeight;
+
+        textElement.text(null); // Clear the original text before rendering final lines
+
+        finalLines.forEach((line, i) => {
+            textElement.append('tspan')
+                .attr('x', x)
+                .attr('y', y)
+                .attr('dy', (startDy + i * lineHeight) + 'em')
+                .text(line);
         });
-    };
+    });
+};
 
     
     /**
@@ -840,8 +857,19 @@ const Visualization = (() => {
         tooltip.style('display', 'none');
     };
 
-    // Render the legend using the external module
-    // This function is imported from legend.js
+    /**
+     * Renders the static legend image to the left of the graph.
+     * The legend is not part of the zoomable area, so it's appended to the main SVG.
+     */
+    const renderLegendImage = () => {
+        svg.append('image')
+            .attr('xlink:href', 'images/legend/legend.png')
+            .attr('x', 10) // Padding from the left edge
+            .attr('y', 10) // Padding from the top edge
+            .attr('width', 300)
+            .attr('height', 600); // Approximate height, can be adjusted if needed
+    };
+
 
     // Helper to update only the edges connected to a node
     const updateNodeEdges = (nodeId) => {
@@ -1215,8 +1243,7 @@ const Visualization = (() => {
 
     // Public API
     return {
-        initialize,
-        renderGraphLegend
+        initialize
     };
 })();
 
