@@ -47,7 +47,12 @@ const Visualization = (() => {
     const setupEventHandlers = () => {
         // Reset zoom button
         d3.select('#reset-zoom').on('click', LayoutLogic.resetZoom);
-        
+        // Reset nodes button
+        d3.select('#reset-nodes').on('click', () => {
+            localStorage.removeItem('dark-graph-node-positions');
+            layout = LayoutLogic.calculateLayout(data);
+            render();
+        });
         // Window resize handler
         window.addEventListener('resize', () => {
             LayoutLogic.updateDimensions();
@@ -750,6 +755,8 @@ const Visualization = (() => {
                         .attr('transform', `translate(${newX - nodeWidth/2}, ${newY - nodeHeight/2})`);
                     // Update only the edges connected to this node
                     updateNodeEdges(d.id);
+                    // Save positions
+                    saveNodePositions();
                 })
             );
         
@@ -1053,6 +1060,40 @@ const Visualization = (() => {
                 .attr('data-source', edge.source)
                 .attr('data-target', edge.target);
         });
+    };
+
+    // Helper to save node positions to localStorage
+    const saveNodePositions = () => {
+        try {
+            localStorage.setItem('dark-graph-node-positions', JSON.stringify(layout.nodePositions));
+        } catch (e) { /* ignore */ }
+    };
+
+    // Helper to load node positions from localStorage
+    const loadNodePositions = () => {
+        try {
+            const saved = localStorage.getItem('dark-graph-node-positions');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Only override positions for nodes that exist in current data
+                Object.keys(parsed).forEach(id => {
+                    if (layout.nodePositions[id]) {
+                        layout.nodePositions[id].x = parsed[id].x;
+                        layout.nodePositions[id].y = parsed[id].y;
+                    }
+                });
+            }
+        } catch (e) { /* ignore */ }
+    };
+
+    // Patch: after layout is calculated, load saved positions
+    const originalCalculateLayout = LayoutLogic.calculateLayout;
+    LayoutLogic.calculateLayout = function(data) {
+        const l = originalCalculateLayout.call(LayoutLogic, data);
+        layout = l; // update reference for helpers
+        // Load saved positions if any
+        loadNodePositions();
+        return layout;
     };
 
     // Public API
