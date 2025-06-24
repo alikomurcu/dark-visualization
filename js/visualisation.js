@@ -687,7 +687,10 @@ const Visualization = (() => {
                     .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
                     .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
                     .style('stroke-linecap', 'round')
-                    .style('stroke-linejoin', 'round');
+                    .style('stroke-linejoin', 'round')
+                    // Add data attributes for easy selection
+                    .attr('data-source', edge.edge.source)
+                    .attr('data-target', edge.edge.target);
                     
                 // Set the appropriate glow color in the filter if it's a time travel edge
                 if (isTimeTravelEdge) {
@@ -730,7 +733,25 @@ const Visualization = (() => {
                 return `translate(${position.x - nodeWidth/2}, ${position.y - nodeHeight/2})`;
             })
             .on('mouseover', showTooltip)
-            .on('mouseout', hideTooltip);
+            .on('mouseout', hideTooltip)
+            // Add drag behavior
+            .call(d3.drag()
+                .on('start', function(event, d) {
+                    d3.select(this).raise();
+                })
+                .on('drag', function(event, d) {
+                    // Update node position in layout.nodePositions
+                    const newX = event.x;
+                    const newY = event.y;
+                    layout.nodePositions[d.id].x = newX;
+                    layout.nodePositions[d.id].y = newY;
+                    // Move the node visually
+                    d3.select(this)
+                        .attr('transform', `translate(${newX - nodeWidth/2}, ${newY - nodeHeight/2})`);
+                    // Update only the edges connected to this node
+                    updateNodeEdges(d.id);
+                })
+            );
         
         // Add rectangle for each node
         nodeGroups.append('rect')
@@ -911,6 +932,128 @@ const Visualization = (() => {
 
     // Render the legend using the external module
     // This function is imported from legend.js
+
+    // Helper to update only the edges connected to a node
+    const updateNodeEdges = (nodeId) => {
+        // Find all edges where nodeId is source or target
+        const connectedEdges = data.edges.filter(e => e.source === nodeId || e.target === nodeId);
+        // Remove their SVG paths (could be in .edges or .timetravel-edges group)
+        connectedEdges.forEach(edge => {
+            // Remove regular edge
+            zoomGroup.selectAll('.edges path').filter(function() {
+                // Use edge source/target id in a data attribute for matching
+                return (
+                    this.getAttribute('data-source') == edge.source &&
+                    this.getAttribute('data-target') == edge.target
+                );
+            }).remove();
+            // Remove time travel edge
+            zoomGroup.selectAll('.timetravel-edges path').filter(function() {
+                return (
+                    this.getAttribute('data-source') == edge.source &&
+                    this.getAttribute('data-target') == edge.target
+                );
+            }).remove();
+        });
+        // Redraw those edges
+        connectedEdges.forEach(edge => {
+            // Reuse the edge rendering logic from renderEdges, but only for this edge
+            const sourcePos = layout.nodePositions[edge.source];
+            const targetPos = layout.nodePositions[edge.target];
+            if (!sourcePos || !targetPos) return;
+            const sourceEvent = data.events.find(e => e.id === edge.source);
+            const targetEvent = data.events.find(e => e.id === edge.target);
+            const isSummarized = DataParser.isSummarizedEdge(edge);
+            const isTimeTravelEdge = sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel;
+            let timeTravelDirection = null;
+            if (isTimeTravelEdge) {
+                const sourceDate = sourceEvent ? new Date(sourceEvent.date) : null;
+                const targetDate = targetEvent ? new Date(targetEvent.date) : null;
+                if (sourceDate && targetDate) {
+                    timeTravelDirection = sourceDate < targetDate ? 'future' : 'past';
+                }
+            }
+            let pathData;
+            let strokeColor = 'white';
+            if (sourcePos.timeRange === targetPos.timeRange) {
+                let curveHeight = 30;
+                const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
+                if (verticalDistance < 40) {
+                    curveHeight = Math.max(15, verticalDistance * 0.5);
+                }
+                if (sourcePos.lane === targetPos.lane) {
+                    const midX = (sourcePos.x + targetPos.x) / 2;
+                    const controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${controlY} ${targetPos.x} ${targetPos.y}`;
+                    if (sourcePos.lane === 'jonas') strokeColor = 'blue';
+                    else if (sourcePos.lane === 'martha') strokeColor = 'green';
+                    else if (sourcePos.lane === 'other') strokeColor = 'yellow';
+                } else {
+                    const dx = targetPos.x - sourcePos.x;
+                    const dy = targetPos.y - sourcePos.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
+                    const cp1x = sourcePos.x + dx * 0.25;
+                    const cp1y = sourcePos.y - distance * curveStrength;
+                    const cp2x = sourcePos.x + dx * 0.75;
+                    const cp2y = targetPos.y - distance * curveStrength;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPos.x} ${targetPos.y}`;
+                    if (sourcePos.lane === 'jonas') strokeColor = 'blue';
+                    else if (sourcePos.lane === 'martha') strokeColor = 'green';
+                    else if (sourcePos.lane === 'other') strokeColor = 'yellow';
+                }
+            } else {
+                const dx = targetPos.x - sourcePos.x;
+                const sourceBox = layout.temporalBoxes.find(b => b.start === sourcePos.timeRange);
+                const targetBox = layout.temporalBoxes.find(b => b.start === targetPos.timeRange);
+                let useSimpleCurve = false;
+                if (!sourceBox || !targetBox) useSimpleCurve = true;
+                if (useSimpleCurve) {
+                    const midX = (sourcePos.x + targetPos.x) / 2;
+                    const midY = (sourcePos.y + targetPos.y) / 2;
+                    const controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY - controlOffset} ${targetPos.x} ${targetPos.y}`;
+                } else {
+                    const midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
+                    const verticalChannelSize = 250;
+                    const avgY = (sourcePos.y + targetPos.y) / 2;
+                    const channelCenterY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
+                    const groupSizeLimit = 10;
+                    const channelIndex = 0; // For single edge update, no group
+                    const channelOffset = channelIndex * 40;
+                    const withinChannelIndex = 0;
+                    const edgeSeparation = 15;
+                    const bundleOffset = 0;
+                    const controlY = channelCenterY + channelOffset + bundleOffset;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ${midX - 120} ${controlY}, ${midX} ${controlY} S ${midX + 120} ${controlY}, ${targetPos.x - dx * 0.15} ${targetPos.y}, ${targetPos.x} ${targetPos.y}`;
+                }
+                strokeColor = 'white';
+            }
+            let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : (isSummarized ? 'summarized-edge' : 'edge');
+            let edgeColor = strokeColor;
+            if (isTimeTravelEdge) {
+                edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
+            }
+            const targetGroup = isTimeTravelEdge ?
+                (zoomGroup.select('.timetravel-edges').size() ? zoomGroup.select('.timetravel-edges') : zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges')) :
+                zoomGroup.select('.edges');
+            targetGroup.append('path')
+                .attr('class', edgeClass)
+                .attr('d', pathData)
+                .attr('marker-end', isTimeTravelEdge ?
+                    (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') :
+                    'url(#arrow)')
+                .style('stroke', edgeColor)
+                .style('stroke-width', isTimeTravelEdge ? 4 : 2)
+                .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
+                .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
+                .style('stroke-linecap', 'round')
+                .style('stroke-linejoin', 'round')
+                // Add data attributes for easy selection
+                .attr('data-source', edge.source)
+                .attr('data-target', edge.target);
+        });
+    };
 
     // Public API
     return {
