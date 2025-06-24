@@ -11,6 +11,10 @@ const Visualization = (() => {
     let data = {};
     let layout = {};
     
+    // Store custom edge control points
+    let customEdgeControls = {};
+    let selectedEdgeKey = null;
+    
     /**
      * Initialize the visualization
      * @param {Object} graphData - Object containing events, edges, and time ranges
@@ -50,7 +54,9 @@ const Visualization = (() => {
         // Reset nodes button
         d3.select('#reset-nodes').on('click', () => {
             localStorage.removeItem('dark-graph-node-positions');
+            resetEdgeControls();
             layout = LayoutLogic.calculateLayout(data);
+            selectedEdgeKey = null;
             render();
         });
         // Window resize handler
@@ -58,6 +64,13 @@ const Visualization = (() => {
             LayoutLogic.updateDimensions();
             layout = LayoutLogic.calculateLayout(data);
             render();
+        });
+        // Deselect edge on background click
+        d3.select('#graph').on('click', function(event) {
+            if (event.target === this) {
+                selectedEdgeKey = null;
+                render();
+            }
         });
     };
     
@@ -74,10 +87,10 @@ const Visualization = (() => {
             
         // Render components in order of layering (bottom to top)
         renderStartArea();
-        renderEdges(); // Render edges first (regular edges go above time travel edges but below boxes)
         renderTemporalBoxes();
         renderSwimlanes();
         renderTransitions();
+        renderEdges(); // Render edges first (regular edges go above time travel edges but below boxes)
         renderNodes();
         renderCharacterImages(); // Add character images
         
@@ -473,236 +486,137 @@ const Visualization = (() => {
      * Render edges between nodes with improved edge bundling
      */
     const renderEdges = () => {
-        // Create group for edges
-        const edgesGroup = zoomGroup.append('g')
-            .attr('class', 'edges');
-        
-        // Group edges by similar paths to improve bundling
-        const edgeGroups = {};
-        
-        // Process edges and group them by source/target temporal boxes
+        // Remove old edges group before drawing new ones
+        zoomGroup.selectAll('.edges').remove();
+        const edgesGroup = zoomGroup.append('g').attr('class', 'edges');
+        // Remove old time travel edges
+        zoomGroup.selectAll('.timetravel-edges').remove();
+        zoomGroup.append('g').attr('class', 'timetravel-edges');
+        // For each edge, draw with custom controls if present
         data.edges.forEach(edge => {
             const sourcePos = layout.nodePositions[edge.source];
             const targetPos = layout.nodePositions[edge.target];
-            
-            // Skip invalid edges
             if (!sourcePos || !targetPos) return;
-            
-            // Create a key based on the temporal boxes to group similar edges
-            const sourceTimeRange = sourcePos.timeRange;
-            const targetTimeRange = targetPos.timeRange;
-            
-            // Create key for grouping similar edges
-            let key;
-            if (sourceTimeRange === targetTimeRange) {
-                // For edges within same time range, group by characters/lanes
-                key = `${sourceTimeRange}_${sourcePos.lane}_${targetPos.lane}`;
-            } else {
-                // For edges between time ranges, group by the time ranges themselves
-                key = `${sourceTimeRange}_${targetTimeRange}`;
-            }
-            
-            if (!edgeGroups[key]) {
-                edgeGroups[key] = [];
-            }
-            
-            // Find the actual event data
             const sourceEvent = data.events.find(e => e.id === edge.source);
             const targetEvent = data.events.find(e => e.id === edge.target);
-            
-            edgeGroups[key].push({
-                edge,
-                source: sourcePos,
-                target: targetPos,
-                sourceEvent,
-                targetEvent
-            });
-        });
-        
-        // Process edge groups
-        Object.values(edgeGroups).forEach(group => {
-            // Sort edges within the group for more consistent bundling
-            group.sort((a, b) => {
-                // Sort by vertical position to help with bundling
-                return (a.source.y + a.target.y) - (b.source.y + b.target.y);
-            });
-            
-            // Create paths for each edge in the group with bundling effect
-            group.forEach((edge, index) => {
-                const { source, target, sourceEvent, targetEvent } = edge;
-                const isSummarized = DataParser.isSummarizedEdge(edge.edge);
-                
-                // Determine if this is a time travel edge based on source or target events
-                const isTimeTravelEdge = sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel;
-                
-                // Determine time travel direction (to future or to past)
-                let timeTravelDirection = null;
-                if (isTimeTravelEdge) {
-                    const sourceDate = sourceEvent ? new Date(sourceEvent.date) : null;
-                    const targetDate = targetEvent ? new Date(targetEvent.date) : null;
-                    
-                    if (sourceDate && targetDate) {
-                        timeTravelDirection = sourceDate < targetDate ? 'future' : 'past';
-                    }
+            const isSummarized = DataParser.isSummarizedEdge(edge);
+            const isTimeTravelEdge = sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel;
+            let timeTravelDirection = null;
+            if (isTimeTravelEdge) {
+                const sourceDate = sourceEvent ? new Date(sourceEvent.date) : null;
+                const targetDate = targetEvent ? new Date(targetEvent.date) : null;
+                if (sourceDate && targetDate) {
+                    timeTravelDirection = sourceDate < targetDate ? 'future' : 'past';
                 }
-                
-                // Calculate path with bundling adjustments
-                let pathData;
-                let strokeColor = 'white';
-                // Check if source and target are in the same temporal box
-                if (source.timeRange === target.timeRange) {
-                    // Use simple curved path for edges within same temporal box
-                    let curveHeight = 30; // Default curve height
-                    
-                    // Adjust curve height based on vertical distance
-                    const verticalDistance = Math.abs(target.y - source.y);
-                    if (verticalDistance < 40) {
-                        curveHeight = Math.max(15, verticalDistance * 0.5);
+            }
+            let pathData;
+            let strokeColor = 'white';
+            let edgeKey = getEdgeKey(edge.source, edge.target);
+            let edgeType = 'other';
+            // Quadratic (same box, same lane)
+            if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
+                edgeType = 'quadratic';
+                let midX = (sourcePos.x + targetPos.x) / 2;
+                let curveHeight = 30;
+                const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
+                if (verticalDistance < 40) {
+                    curveHeight = Math.max(15, verticalDistance * 0.5);
+                }
+                let controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
+                if (customEdgeControls[edgeKey]) {
+                    midX = customEdgeControls[edgeKey].x;
+                    controlY = customEdgeControls[edgeKey].y;
+                }
+                pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${controlY} ${targetPos.x} ${targetPos.y}`;
+                if (sourcePos.lane === 'jonas') strokeColor = 'blue';
+                else if (sourcePos.lane === 'martha') strokeColor = 'green';
+                else if (sourcePos.lane === 'other') strokeColor = 'yellow';
+            }
+            // Cubic (same box, different lane)
+            else if (sourcePos.timeRange === targetPos.timeRange) {
+                edgeType = 'cubic';
+                const dx = targetPos.x - sourcePos.x;
+                const dy = targetPos.y - sourcePos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
+                let cp1x = sourcePos.x + dx * 0.25;
+                let cp1y = sourcePos.y - distance * curveStrength;
+                let cp2x = sourcePos.x + dx * 0.75;
+                let cp2y = targetPos.y - distance * curveStrength;
+                if (customEdgeControls[edgeKey]) {
+                    cp1x = customEdgeControls[edgeKey].cp1x;
+                    cp1y = customEdgeControls[edgeKey].cp1y;
+                    cp2x = customEdgeControls[edgeKey].cp2x;
+                    cp2y = customEdgeControls[edgeKey].cp2y;
+                }
+                pathData = `M ${sourcePos.x} ${sourcePos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPos.x} ${targetPos.y}`;
+                if (sourcePos.lane === 'jonas') strokeColor = 'blue';
+                else if (sourcePos.lane === 'martha') strokeColor = 'green';
+                else if (sourcePos.lane === 'other') strokeColor = 'yellow';
+            }
+            // Bundled/complex (different box)
+            else {
+                edgeType = 'bundled';
+                const dx = targetPos.x - sourcePos.x;
+                const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
+                const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
+                const sourceBox = layout.temporalBoxes[sourceBoxIndex];
+                const targetBox = layout.temporalBoxes[targetBoxIndex];
+                let useSimpleCurve = false;
+                if (!sourceBox || !targetBox) useSimpleCurve = true;
+                if (useSimpleCurve) {
+                    let midX = (sourcePos.x + targetPos.x) / 2;
+                    let midY = (sourcePos.y + targetPos.y) / 2;
+                    let controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
+                    if (customEdgeControls[edgeKey]) {
+                        midX = customEdgeControls[edgeKey].x;
+                        midY = customEdgeControls[edgeKey].y;
                     }
-                    
-                    // For edges in same lane, use more curved paths
-                    if (source.lane === target.lane) {
-                        const midX = (source.x + target.x) / 2;
-                        const controlY = (source.y + target.y) / 2 - curveHeight;
-                        
-                        pathData = `M ${source.x} ${source.y} Q ${midX} ${controlY} ${target.x} ${target.y}`;
-                        if (source.lane === 'jonas') strokeColor = 'blue';
-                        else if (source.lane === 'martha') strokeColor = 'green';
-                        else if (source.lane === 'other') strokeColor = 'yellow';
-                    } else {
-                        // For edges between different lanes in same temporal box
-                        // Use cubic curve for smoother path
-                        const dx = target.x - source.x;
-                        const dy = target.y - source.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        // Calculate control points
-                        const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
-                        const cp1x = source.x + dx * 0.25;
-                        const cp1y = source.y - distance * curveStrength;
-                        const cp2x = source.x + dx * 0.75;
-                        const cp2y = target.y - distance * curveStrength;
-                        
-                        pathData = `M ${source.x} ${source.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${target.x} ${target.y}`;
-                        if (source.lane === 'jonas') strokeColor = 'blue';
-                        else if (source.lane === 'martha') strokeColor = 'green';
-                        else if (source.lane === 'other') strokeColor = 'yellow';
-                        
-                    }
-                    strokeWidth = 1;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY - controlOffset} ${targetPos.x} ${targetPos.y}`;
                 } else {
-                    // For edges between different temporal boxes, create more pronounced bundled effect
-                    // Calculate fixed control points for consistent bundling
-                    const dx = target.x - source.x;
-                    
-                    // Use a fixed central channel for bundling
-                    // This creates a strong visual bundling effect
-                    const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === source.timeRange);
-                    const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === target.timeRange);
-                    
-                    // Find the temporal boxes, with safety checks
-                    const sourceBox = layout.temporalBoxes[sourceBoxIndex];
-                    const targetBox = layout.temporalBoxes[targetBoxIndex];
-                    
-                    // Check if the boxes exist
-                    let useSimpleCurve = false;
-                    if (!sourceBox || !targetBox) {
-                        useSimpleCurve = true;
+                    let midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
+                    const verticalChannelSize = 250;
+                    const avgY = (sourcePos.y + targetPos.y) / 2;
+                    let channelCenterY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
+                    let controlY = channelCenterY;
+                    if (customEdgeControls[edgeKey]) {
+                        midX = customEdgeControls[edgeKey].x;
+                        controlY = customEdgeControls[edgeKey].y;
                     }
-                    
-                    if (useSimpleCurve) {
-                        // Use a simple curved path when boxes can't be found
-                        const midX = (source.x + target.x) / 2;
-                        const midY = (source.y + target.y) / 2;
-                        const controlOffset = Math.min(150, Math.abs(target.x - source.x) * 0.3);
-                        
-                        pathData = `M ${source.x} ${source.y} ` +
-                                   `Q ${midX} ${midY - controlOffset} ` +
-                                   `${target.x} ${target.y}`;
-                    } else {
-                        // For the large visualization, use much more pronounced bundling
-                        // Calculate the midpoint between the boxes (where the bundle should go through)
-                        const midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
-                        
-                        // Create a vertical "channel" where all edges between these boxes will pass through
-                        // For large visualization (12288x1200), we need more pronounced bundling
-                        const verticalChannelSize = 250; // Larger channel for more visual separation
-                        
-                        // Base position of the channel - place it above or below based on source/target positions
-                        const avgY = (source.y + target.y) / 2;
-                        const channelCenterY = avgY < height / 2 ? 
-                                               Math.max(100, avgY - verticalChannelSize) : 
-                                               Math.min(height - 100, avgY + verticalChannelSize);
-                        
-                        // Use group index to create multiple parallel channels if needed
-                        const groupSizeLimit = 10; // Maximum edges per channel
-                        const channelIndex = Math.floor(index / groupSizeLimit);
-                        const channelOffset = channelIndex * 40; // Offset for multiple channels
-                        
-                        // Calculate edge position within its channel
-                        const withinChannelIndex = index % groupSizeLimit;
-                        const edgeSeparation = 15; // More space between edges in large visualization
-                        const bundleOffset = (withinChannelIndex - (Math.min(group.length, groupSizeLimit) - 1) / 2) * edgeSeparation;
-                        
-                        // Final control point Y position
-                        const controlY = channelCenterY + channelOffset + bundleOffset;
-                        
-                        // Create a more exaggerated path for the large visualization 
-                        // with more space between control points
-                        pathData = `M ${source.x} ${source.y} ` +
-                                   `C ${source.x + dx * 0.15} ${source.y}, ` +
-                                   `${midX - 120} ${controlY}, ` +
-                                   `${midX} ${controlY} ` +
-                                   `S ${midX + 120} ${controlY}, ` +
-                                   `${target.x - dx * 0.15} ${target.y}, ` +
-                                   `${target.x} ${target.y}`;
-                    }
-
-                    strokeColor = 'white';
-                    strokeWidth = isTimeTravelEdge ? 3 : 2;
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ${midX - 120} ${controlY}, ${midX} ${controlY} S ${midX + 120} ${controlY}, ${targetPos.x - dx * 0.15} ${targetPos.y}, ${targetPos.x} ${targetPos.y}`;
                 }
-
-                // Create separate groups for regular edges and time travel edges (for z-ordering)
-                // Time travel edges should be drawn below all other elements
-                const targetGroup = isTimeTravelEdge ? 
-                    zoomGroup.select('.timetravel-edges').size() ? 
-                        zoomGroup.select('.timetravel-edges') : 
-                        zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges') : 
-                    edgesGroup;
-                
-                // Determine appropriate CSS class and color based on time travel direction
-                let edgeClass = isTimeTravelEdge ? 
-                    (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : 
-                    (isSummarized ? 'summarized-edge' : 'edge');
-                    
-                let edgeColor = strokeColor;
-                if (isTimeTravelEdge) {
-                    edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6'; // Orange for future, blue for past
-                }
-                
-                // Create path element with appropriate styling
-                targetGroup.append('path')
-                    .attr('class', edgeClass)
-                    .attr('d', pathData)
-                    .attr('marker-end', isTimeTravelEdge ? 
-                        (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') : 
-                        'url(#arrow)')
-                    .style('stroke', edgeColor) 
-                    .style('stroke-width', isTimeTravelEdge ? 4 : strokeWidth) // Wider stroke for time travel
-                    .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
-                    .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
-                    .style('stroke-linecap', 'round')
-                    .style('stroke-linejoin', 'round')
-                    // Add data attributes for easy selection
-                    .attr('data-source', edge.edge.source)
-                    .attr('data-target', edge.edge.target);
-                    
-                // Set the appropriate glow color in the filter if it's a time travel edge
-                if (isTimeTravelEdge) {
-                    // The actual glow color is managed via CSS classes
-                }
-            });
+                strokeColor = 'white';
+            }
+            let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : (isSummarized ? 'summarized-edge' : 'edge');
+            let edgeColor = strokeColor;
+            if (isTimeTravelEdge) {
+                edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
+            }
+            const targetGroup = isTimeTravelEdge ?
+                (zoomGroup.select('.timetravel-edges').size() ? zoomGroup.select('.timetravel-edges') : zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges')) :
+                edgesGroup;
+            // Draw edge path
+            const path = targetGroup.append('path')
+                .attr('class', edgeClass + (selectedEdgeKey === edgeKey ? ' selected' : ''))
+                .attr('d', pathData)
+                .attr('marker-end', isTimeTravelEdge ?
+                    (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') :
+                    'url(#arrow)')
+                .style('stroke', edgeColor)
+                .style('stroke-width', isTimeTravelEdge ? 4 : 2)
+                .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
+                .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
+                .style('stroke-linecap', 'round')
+                .style('stroke-linejoin', 'round')
+                .attr('data-source', edge.source)
+                .attr('data-target', edge.target)
+                .on('click', function(event) {
+                    event.stopPropagation();
+                    selectedEdgeKey = edgeKey;
+                    render();
+                });
         });
+        renderEdgeControls();
     };
     
     /**
@@ -754,7 +668,7 @@ const Visualization = (() => {
                     d3.select(this)
                         .attr('transform', `translate(${newX - nodeWidth/2}, ${newY - nodeHeight/2})`);
                     // Update only the edges connected to this node
-                    updateNodeEdges(d.id);
+                    renderEdges();
                     // Save positions
                     saveNodePositions();
                 })
@@ -970,7 +884,7 @@ const Visualization = (() => {
             if (!sourcePos || !targetPos) return;
             const sourceEvent = data.events.find(e => e.id === edge.source);
             const targetEvent = data.events.find(e => e.id === edge.target);
-            const isSummarized = DataParser.isSummarizedEdge(edge);
+            const isSummarized = DataParser.isSummarizedEdge(edge.edge);
             const isTimeTravelEdge = sourceEvent?.isTimeTravel || targetEvent?.isTimeTravel;
             let timeTravelDirection = null;
             if (isTimeTravelEdge) {
@@ -996,69 +910,137 @@ const Visualization = (() => {
                     else if (sourcePos.lane === 'martha') strokeColor = 'green';
                     else if (sourcePos.lane === 'other') strokeColor = 'yellow';
                 } else {
+                    // For edges between different lanes in same temporal box
+                    // Use cubic curve for smoother path
                     const dx = targetPos.x - sourcePos.x;
                     const dy = targetPos.y - sourcePos.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Calculate control points
                     const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
                     const cp1x = sourcePos.x + dx * 0.25;
                     const cp1y = sourcePos.y - distance * curveStrength;
                     const cp2x = sourcePos.x + dx * 0.75;
                     const cp2y = targetPos.y - distance * curveStrength;
+                    
                     pathData = `M ${sourcePos.x} ${sourcePos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${targetPos.x} ${targetPos.y}`;
                     if (sourcePos.lane === 'jonas') strokeColor = 'blue';
                     else if (sourcePos.lane === 'martha') strokeColor = 'green';
                     else if (sourcePos.lane === 'other') strokeColor = 'yellow';
+                    
                 }
+                strokeWidth = 1;
             } else {
+                // For edges between different temporal boxes, create more pronounced bundled effect
+                // Calculate fixed control points for consistent bundling
                 const dx = targetPos.x - sourcePos.x;
-                const sourceBox = layout.temporalBoxes.find(b => b.start === sourcePos.timeRange);
-                const targetBox = layout.temporalBoxes.find(b => b.start === targetPos.timeRange);
+                
+                // Use a fixed central channel for bundling
+                // This creates a strong visual bundling effect
+                const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
+                const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
+                
+                // Find the temporal boxes, with safety checks
+                const sourceBox = layout.temporalBoxes[sourceBoxIndex];
+                const targetBox = layout.temporalBoxes[targetBoxIndex];
+                
+                // Check if the boxes exist
                 let useSimpleCurve = false;
-                if (!sourceBox || !targetBox) useSimpleCurve = true;
+                if (!sourceBox || !targetBox) {
+                    useSimpleCurve = true;
+                }
+                
                 if (useSimpleCurve) {
+                    // Use a simple curved path when boxes can't be found
                     const midX = (sourcePos.x + targetPos.x) / 2;
                     const midY = (sourcePos.y + targetPos.y) / 2;
                     const controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
-                    pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${midY - controlOffset} ${targetPos.x} ${targetPos.y}`;
+                    
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} ` +
+                               `Q ${midX} ${midY - controlOffset} ` +
+                               `${targetPos.x} ${targetPos.y}`;
                 } else {
+                    // For the large visualization, use much more pronounced bundling
+                    // Calculate the midpoint between the boxes (where the bundle should go through)
                     const midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
-                    const verticalChannelSize = 250;
+                    
+                    // Create a vertical "channel" where all edges between these boxes will pass through
+                    // For large visualization (12288x1200), we need more pronounced bundling
+                    const verticalChannelSize = 250; // Larger channel for more visual separation
+                    
+                    // Base position of the channel - place it above or below based on source/target positions
                     const avgY = (sourcePos.y + targetPos.y) / 2;
-                    const channelCenterY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
-                    const groupSizeLimit = 10;
-                    const channelIndex = 0; // For single edge update, no group
-                    const channelOffset = channelIndex * 40;
-                    const withinChannelIndex = 0;
-                    const edgeSeparation = 15;
-                    const bundleOffset = 0;
+                    const channelCenterY = avgY < height / 2 ? 
+                                           Math.max(100, avgY - verticalChannelSize) : 
+                                           Math.min(height - 100, avgY + verticalChannelSize);
+                    
+                    // Use group index to create multiple parallel channels if needed
+                    const groupSizeLimit = 10; // Maximum edges per channel
+                    const channelIndex = Math.floor(index / groupSizeLimit);
+                    const channelOffset = channelIndex * 40; // Offset for multiple channels
+                    
+                    // Calculate edge position within its channel
+                    const withinChannelIndex = index % groupSizeLimit;
+                    const edgeSeparation = 15; // More space between edges in large visualization
+                    const bundleOffset = (withinChannelIndex - (Math.min(group.length, groupSizeLimit) - 1) / 2) * edgeSeparation;
+                    
+                    // Final control point Y position
                     const controlY = channelCenterY + channelOffset + bundleOffset;
-                    pathData = `M ${sourcePos.x} ${sourcePos.y} C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ${midX - 120} ${controlY}, ${midX} ${controlY} S ${midX + 120} ${controlY}, ${targetPos.x - dx * 0.15} ${targetPos.y}, ${targetPos.x} ${targetPos.y}`;
+                    
+                    // Create a more exaggerated path for the large visualization 
+                    // with more space between control points
+                    pathData = `M ${sourcePos.x} ${sourcePos.y} ` +
+                               `C ${sourcePos.x + dx * 0.15} ${sourcePos.y}, ` +
+                               `${midX - 120} ${controlY}, ` +
+                               `${midX} ${controlY} ` +
+                               `S ${midX + 120} ${controlY}, ` +
+                               `${targetPos.x - dx * 0.15} ${targetPos.y}, ` +
+                               `${targetPos.x} ${targetPos.y}`;
                 }
+
                 strokeColor = 'white';
+                strokeWidth = isTimeTravelEdge ? 3 : 2;
             }
-            let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : (isSummarized ? 'summarized-edge' : 'edge');
+
+            // Create separate groups for regular edges and time travel edges (for z-ordering)
+            // Time travel edges should be drawn below all other elements
+            const targetGroup = isTimeTravelEdge ? 
+                zoomGroup.select('.timetravel-edges').size() ? 
+                    zoomGroup.select('.timetravel-edges') : 
+                    zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges') : 
+                edgesGroup;
+            
+            // Determine appropriate CSS class and color based on time travel direction
+            let edgeClass = isTimeTravelEdge ? 
+                (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : 
+                (isSummarized ? 'summarized-edge' : 'edge');
+                
             let edgeColor = strokeColor;
             if (isTimeTravelEdge) {
-                edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
+                edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6'; // Orange for future, blue for past
             }
-            const targetGroup = isTimeTravelEdge ?
-                (zoomGroup.select('.timetravel-edges').size() ? zoomGroup.select('.timetravel-edges') : zoomGroup.insert('g', ':first-child').attr('class', 'timetravel-edges')) :
-                zoomGroup.select('.edges');
+            
+            // Create path element with appropriate styling
             targetGroup.append('path')
                 .attr('class', edgeClass)
                 .attr('d', pathData)
-                .attr('marker-end', isTimeTravelEdge ?
-                    (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') :
+                .attr('marker-end', isTimeTravelEdge ? 
+                    (timeTravelDirection === 'future' ? 'url(#timetravel-future-arrow)' : 'url(#timetravel-past-arrow)') : 
                     'url(#arrow)')
-                .style('stroke', edgeColor)
-                .style('stroke-width', isTimeTravelEdge ? 4 : 2)
+                .style('stroke', edgeColor) 
+                .style('stroke-width', isTimeTravelEdge ? 4 : strokeWidth) // Wider stroke for time travel
                 .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
                 .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
                 .style('stroke-linecap', 'round')
                 .style('stroke-linejoin', 'round')
                 // Add data attributes for easy selection
-                .attr('data-source', edge.source)
-                .attr('data-target', edge.target);
+                .attr('data-source', edge.edge.source)
+                .attr('data-target', edge.edge.target);
+                
+            // Set the appropriate glow color in the filter if it's a time travel edge
+            if (isTimeTravelEdge) {
+                // The actual glow color is managed via CSS classes
+            }
         });
     };
 
@@ -1086,14 +1068,251 @@ const Visualization = (() => {
         } catch (e) { /* ignore */ }
     };
 
-    // Patch: after layout is calculated, load saved positions
+    // Helper to save edge controls to localStorage
+    const saveEdgeControls = () => {
+        try {
+            localStorage.setItem('dark-graph-edge-controls', JSON.stringify(customEdgeControls));
+        } catch (e) { /* ignore */ }
+    };
+    // Helper to load edge controls from localStorage
+    const loadEdgeControls = () => {
+        try {
+            const saved = localStorage.getItem('dark-graph-edge-controls');
+            if (saved) customEdgeControls = JSON.parse(saved);
+        } catch (e) { customEdgeControls = {}; }
+    };
+    // Helper to reset edge controls
+    const resetEdgeControls = () => {
+        customEdgeControls = {};
+        localStorage.removeItem('dark-graph-edge-controls');
+    };
+
+    // Patch: after layout is calculated, load saved positions and edge controls
     const originalCalculateLayout = LayoutLogic.calculateLayout;
     LayoutLogic.calculateLayout = function(data) {
         const l = originalCalculateLayout.call(LayoutLogic, data);
-        layout = l; // update reference for helpers
-        // Load saved positions if any
+        layout = l;
         loadNodePositions();
+        loadEdgeControls();
         return layout;
+    };
+
+    // Helper to get edge key (direction-agnostic)
+    const getEdgeKey = (source, target) => {
+        // Always sort ids to avoid direction issues
+        return [source, target].sort().join('--');
+    };
+
+    // Clamp a value to the visible SVG area
+    const clampToSVG = (x, y) => {
+        const svg = document.getElementById('graph');
+        const width = svg ? svg.clientWidth : 12288;
+        const height = svg ? svg.clientHeight : 1200;
+        return [
+            Math.max(0, Math.min(width, x)),
+            Math.max(0, Math.min(height, y))
+        ];
+    };
+
+    // Helper: Quadratic Bézier at t
+    function quadBezier(t, p0, p1, p2) {
+        const x = (1-t)*(1-t)*p0.x + 2*(1-t)*t*p1.x + t*t*p2.x;
+        const y = (1-t)*(1-t)*p0.y + 2*(1-t)*t*p1.y + t*t*p2.y;
+        return {x, y};
+    }
+    // Helper: Cubic Bézier at t
+    function cubicBezier(t, p0, p1, p2, p3) {
+        const x = Math.pow(1-t,3)*p0.x + 3*Math.pow(1-t,2)*t*p1.x + 3*(1-t)*t*t*p2.x + t*t*t*p3.x;
+        const y = Math.pow(1-t,3)*p0.y + 3*Math.pow(1-t,2)*t*p1.y + 3*(1-t)*t*t*p2.y + t*t*t*p3.y;
+        return {x, y};
+    }
+
+    // Render edge control handles for the selected edge
+    const renderEdgeControls = () => {
+        zoomGroup.selectAll('.edge-control').remove();
+        zoomGroup.selectAll('.edge-control-hit').remove();
+        if (!selectedEdgeKey) return;
+        // Find the selected edge
+        const edge = data.edges.find(e => getEdgeKey(e.source, e.target) === selectedEdgeKey);
+        if (!edge) return;
+        const sourcePos = layout.nodePositions[edge.source];
+        const targetPos = layout.nodePositions[edge.target];
+        if (!sourcePos || !targetPos) return;
+        // Quadratic (same box, same lane)
+        if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
+            let midX = (sourcePos.x + targetPos.x) / 2;
+            let curveHeight = 30;
+            const verticalDistance = Math.abs(targetPos.y - sourcePos.y);
+            if (verticalDistance < 40) {
+                curveHeight = Math.max(15, verticalDistance * 0.5);
+            }
+            let controlY = (sourcePos.y + targetPos.y) / 2 - curveHeight;
+            if (customEdgeControls[selectedEdgeKey]) {
+                midX = customEdgeControls[selectedEdgeKey].x;
+                controlY = customEdgeControls[selectedEdgeKey].y;
+            }
+            // Draw a large transparent hit area for easier interaction
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control-hit')
+                .attr('cx', midX)
+                .attr('cy', controlY)
+                .attr('r', 18)
+                .attr('fill', 'transparent')
+                .style('pointer-events', 'all');
+            // Draw the visible handle at the actual control point
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control')
+                .attr('cx', midX)
+                .attr('cy', controlY)
+                .attr('r', 10)
+                .attr('fill', '#ff9800')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .attr('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function() { d3.select(this).raise(); })
+                    .on('drag', function(event) {
+                        customEdgeControls[selectedEdgeKey] = { x: event.x, y: event.y };
+                        saveEdgeControls();
+                        render();
+                    })
+                );
+        }
+        // Cubic (same box, different lane)
+        else if (sourcePos.timeRange === targetPos.timeRange) {
+            const dx = targetPos.x - sourcePos.x;
+            const dy = targetPos.y - sourcePos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const curveStrength = Math.min(0.4, Math.max(0.2, distance / 400));
+            let cp1x = sourcePos.x + dx * 0.25;
+            let cp1y = sourcePos.y - distance * curveStrength;
+            let cp2x = sourcePos.x + dx * 0.75;
+            let cp2y = targetPos.y - distance * curveStrength;
+            if (customEdgeControls[selectedEdgeKey]) {
+                cp1x = customEdgeControls[selectedEdgeKey].cp1x;
+                cp1y = customEdgeControls[selectedEdgeKey].cp1y;
+                cp2x = customEdgeControls[selectedEdgeKey].cp2x;
+                cp2y = customEdgeControls[selectedEdgeKey].cp2y;
+            }
+            // Draw two draggable handles at the actual control points
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control-hit')
+                .attr('cx', cp1x)
+                .attr('cy', cp1y)
+                .attr('r', 18)
+                .attr('fill', 'transparent')
+                .style('pointer-events', 'all');
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control')
+                .attr('cx', cp1x)
+                .attr('cy', cp1y)
+                .attr('r', 10)
+                .attr('fill', '#ff9800')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .attr('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function() { d3.select(this).raise(); })
+                    .on('drag', function(event) {
+                        customEdgeControls[selectedEdgeKey] = customEdgeControls[selectedEdgeKey] || {};
+                        customEdgeControls[selectedEdgeKey].cp1x = event.x;
+                        customEdgeControls[selectedEdgeKey].cp1y = event.y;
+                        // Keep cp2 as is
+                        if (!('cp2x' in customEdgeControls[selectedEdgeKey])) {
+                            customEdgeControls[selectedEdgeKey].cp2x = cp2x;
+                            customEdgeControls[selectedEdgeKey].cp2y = cp2y;
+                        }
+                        saveEdgeControls();
+                        render();
+                    })
+                );
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control-hit')
+                .attr('cx', cp2x)
+                .attr('cy', cp2y)
+                .attr('r', 18)
+                .attr('fill', 'transparent')
+                .style('pointer-events', 'all');
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control')
+                .attr('cx', cp2x)
+                .attr('cy', cp2y)
+                .attr('r', 10)
+                .attr('fill', '#ff9800')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .attr('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function() { d3.select(this).raise(); })
+                    .on('drag', function(event) {
+                        customEdgeControls[selectedEdgeKey] = customEdgeControls[selectedEdgeKey] || {};
+                        customEdgeControls[selectedEdgeKey].cp2x = event.x;
+                        customEdgeControls[selectedEdgeKey].cp2y = event.y;
+                        // Keep cp1 as is
+                        if (!('cp1x' in customEdgeControls[selectedEdgeKey])) {
+                            customEdgeControls[selectedEdgeKey].cp1x = cp1x;
+                            customEdgeControls[selectedEdgeKey].cp1y = cp1y;
+                        }
+                        saveEdgeControls();
+                        render();
+                    })
+                );
+        }
+        // Bundled/complex (different box)
+        else {
+            const dx = targetPos.x - sourcePos.x;
+            const sourceBoxIndex = layout.temporalBoxes.findIndex(b => b.start === sourcePos.timeRange);
+            const targetBoxIndex = layout.temporalBoxes.findIndex(b => b.start === targetPos.timeRange);
+            const sourceBox = layout.temporalBoxes[sourceBoxIndex];
+            const targetBox = layout.temporalBoxes[targetBoxIndex];
+            let useSimpleCurve = false;
+            if (!sourceBox || !targetBox) useSimpleCurve = true;
+            let midX, controlY;
+            if (useSimpleCurve) {
+                midX = (sourcePos.x + targetPos.x) / 2;
+                let midY = (sourcePos.y + targetPos.y) / 2;
+                let controlOffset = Math.min(150, Math.abs(targetPos.x - sourcePos.x) * 0.3);
+                controlY = midY - controlOffset;
+                if (customEdgeControls[selectedEdgeKey]) {
+                    midX = customEdgeControls[selectedEdgeKey].x;
+                    controlY = customEdgeControls[selectedEdgeKey].y;
+                }
+            } else {
+                midX = sourceBox.x + sourceBox.width + (targetBox.x - (sourceBox.x + sourceBox.width)) / 2;
+                const verticalChannelSize = 250;
+                const avgY = (sourcePos.y + targetPos.y) / 2;
+                controlY = avgY < height / 2 ? Math.max(100, avgY - verticalChannelSize) : Math.min(height - 100, avgY + verticalChannelSize);
+                if (customEdgeControls[selectedEdgeKey]) {
+                    midX = customEdgeControls[selectedEdgeKey].x;
+                    controlY = customEdgeControls[selectedEdgeKey].y;
+                }
+            }
+            // Draw a large transparent hit area for easier interaction
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control-hit')
+                .attr('cx', midX)
+                .attr('cy', controlY)
+                .attr('r', 18)
+                .attr('fill', 'transparent')
+                .style('pointer-events', 'all');
+            zoomGroup.append('circle')
+                .attr('class', 'edge-control')
+                .attr('cx', midX)
+                .attr('cy', controlY)
+                .attr('r', 10)
+                .attr('fill', '#ff9800')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .attr('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', function() { d3.select(this).raise(); })
+                    .on('drag', function(event) {
+                        customEdgeControls[selectedEdgeKey] = { x: event.x, y: event.y };
+                        saveEdgeControls();
+                        render();
+                    })
+                );
+        }
     };
 
     // Public API
