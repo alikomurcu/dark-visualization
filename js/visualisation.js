@@ -1324,9 +1324,9 @@ const savePng = () => {
         originalTransform = zoomGroup.getAttribute('transform');
         // Use the new setTransform logic
         if (window.LayoutLogic && typeof window.LayoutLogic.setTransform === 'function') {
-            window.LayoutLogic.setTransform({ x: 1000, y: 100, k: 0.85 });
+            window.LayoutLogic.setTransform({ x: 1000, y: 100, k: 3.0 });
         } else {
-            zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.85)');
+            zoomGroup.setAttribute('transform', 'translate(1000,100) scale(1)');
         }
     }
 
@@ -1348,8 +1348,8 @@ const savePng = () => {
         }
     }
 
-    const WIDTH = 12288;
-    const HEIGHT = 1200;
+    const WIDTH = 14456 * 3;
+    const HEIGHT = 1411 * 3;
     const LEGEND_WIDTH = 1800;
     // Original legend.png: 600x1250, textLegend.png: 800x634
     const LEFT_ORIG_W = 600, LEFT_ORIG_H = 1250;
