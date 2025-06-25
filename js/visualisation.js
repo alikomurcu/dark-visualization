@@ -1376,7 +1376,7 @@ const savePng = () => {
         .node.origin { fill: #9b59b6; }
         .node.start { fill: #69e8a8;}
         .node.other { fill:rgb(27, 28, 15); }
-        .node-text { font-size: 10px; font-weight: 600; fill: #f0f0f0; pointer-events: none; }
+        .node-text { font-size: 16px; font-weight: 600; fill: #000000; pointer-events: none; }
         .edge { stroke: rgba(238, 242, 245, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
         .summarized-edge { stroke: rgba(240, 240, 240, 0.75); stroke-width: 1.6px; stroke-dasharray: 4,3; fill: none; opacity: 0.85; }
         .time-travel-past-edge { stroke: rgba(100, 181, 246, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
