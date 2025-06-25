@@ -1324,7 +1324,7 @@ const savePng = () => {
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('width', WIDTH);
     bgRect.setAttribute('height', HEIGHT);
-    bgRect.setAttribute('fill', '#121212');
+    bgRect.setAttribute('fill', '#1a1a2e');
     clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
 
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
