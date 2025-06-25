@@ -53,6 +53,20 @@ const ImageManager = (() => {
         d3.select('#move-left-btn').on('click', () => moveSelectedImage('left'));
         d3.select('#move-right-btn').on('click', () => moveSelectedImage('right'));
         
+        // Global scale input
+        d3.select('#scale-input').on('input', function() {
+            const newScale = parseFloat(this.value);
+            if (selectedImageId) {
+                const imageData = uploadedImages.find(img => img.id === selectedImageId);
+                if (imageData) {
+                    imageData.scale = newScale;
+                    updateImageTransform(selectedImageId);
+                    saveImages();
+                    updateImageList(); // Update the slider in the list
+                }
+            }
+        });
+        
         // File input change
         d3.select('#image-upload').on('change', handleFileUpload);
         
@@ -194,6 +208,13 @@ const ImageManager = (() => {
      */
     const selectImage = (imageId) => {
         selectedImageId = imageId;
+        
+        // Update global scale input with selected image's scale
+        const imageData = uploadedImages.find(img => img.id === imageId);
+        if (imageData) {
+            d3.select('#scale-input').property('value', imageData.scale);
+        }
+        
         renderImages();
         updateImageList();
     };
@@ -203,6 +224,10 @@ const ImageManager = (() => {
      */
     const deselectImage = () => {
         selectedImageId = null;
+        
+        // Clear global scale input when no image is selected
+        d3.select('#scale-input').property('value', '1.0');
+        
         renderImages();
         updateImageList();
     };
@@ -254,6 +279,12 @@ const ImageManager = (() => {
                     const newScale = parseFloat(this.value);
                     imageData.scale = newScale;
                     d3.select(this.parentNode.parentNode).select('.image-scale-value').text(`${newScale}x`);
+                    
+                    // Update global scale input if this is the selected image
+                    if (selectedImageId === imageData.id) {
+                        d3.select('#scale-input').property('value', newScale);
+                    }
+                    
                     // Use efficient single image update instead of full re-render
                     updateImageTransform(imageData.id);
                     // Save immediately since we're not dragging
