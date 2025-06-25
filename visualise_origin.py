@@ -12,7 +12,7 @@ def create_origin_graph(output_filename="origin_graph.png"):
     V_SPACING = 80 * SCALE
     PADDING = 50 * SCALE
 
-    BG_COLOR = "#1e1e2f"
+    BG_COLOR = "#1a1a2e"
     NODE_COLOR = "#708BFC"
     TEXT_COLOR = "#000000"
     ARROW_COLOR = "#FFFFFF"
