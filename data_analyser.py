@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 def load_data():
     """Load and prepare the graph data from CSV files."""
-    events_df = pd.read_csv('Dark_Events.csv')
-    edges_df = pd.read_csv('Dark_Edges.csv')
+    events_df = pd.read_csv('data/Dark_Events.csv')
+    edges_df = pd.read_csv('data/Dark_Edges.csv')
     return events_df, edges_df
 
 def create_graph(events_df, edges_df):
