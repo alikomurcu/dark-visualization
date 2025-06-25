@@ -508,9 +508,9 @@ const Visualization = (() => {
                 }
             }
             let edgeKey = getEdgeKey(edge.source, edge.target);
-            let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : (isSummarized ? 'summarized-edge' : 'edge');
+            let edgeClass = isTimeTravelEdge ? (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : 'edge';
             // Restore original coloring logic
-            let edgeColor = 'white';
+            let edgeColor = '#f7fcff';
             if (isTimeTravelEdge) {
                 edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
             } // else keep white for bundled/complex
@@ -1023,7 +1023,7 @@ const wrap = (text, width) => {
             // Determine appropriate CSS class and color based on time travel direction
             let edgeClass = isTimeTravelEdge ? 
                 (timeTravelDirection === 'future' ? 'time-travel-future-edge' : 'time-travel-past-edge') : 
-                (isSummarized ? 'summarized-edge' : 'edge');
+                'edge';
                 
             let edgeColor = strokeColor;
             if (isTimeTravelEdge) {
