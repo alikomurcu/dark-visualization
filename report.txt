@@ -1,0 +1,72 @@
+Dark Series Graph Analysis Report
+==============================
+
+Events Distribution Across Worlds:
+Jonas: 425 events
+Martha: 107 events
+Origin: 9 events
+Origin (End): 5 events
+
+Temporal Distribution of Events:
+Year 1888: 22 events
+Year 1890: 5 events
+Year 1904: 1 events
+Year 1910: 1 events
+Year 1911: 4 events
+Year 1920: 17 events
+Year 1921: 23 events
+Year 1953: 19 events
+Year 1954: 32 events
+Year 1971: 14 events
+Year 1976: 3 events
+Year 1985: 3 events
+Year 1986: 62 events
+Year 1987: 46 events
+Year 2019: 115 events
+Year 2020: 82 events
+Year 2021: 2 events
+Year 2023: 4 events
+Year 2040: 8 events
+Year 2041: 6 events
+Year 2052: 34 events
+Year 2053: 43 events
+
+Total time span: 165 years
+
+Top 10 Most Frequently Appearing Characters:
+Jonas Kahnwald / Adam (J): 184 appearances
+Martha Nielsen / Eve (M): 90 appearances
+Claudia Tiedemann (J): 74 appearances
+Noah / Hanno Tauber (J): 48 appearances
+Ulrich Nielsen (J): 38 appearances
+Elisabeth Doppler (J): 33 appearances
+Charlotte Doppler (J): 28 appearances
+Hannah Kahnwald (J): 28 appearances
+Helge Doppler (J): 28 appearances
+Bartosz Tiedemann (J): 27 appearances
+
+Important Events Analysis:
+Important trigger events: 37
+Death events: 24
+
+Graph Structure Analysis:
+Number of events (nodes): 546
+Number of connections (edges): 624
+
+Top 5 most central events (by betweenness centrality):
+Event 377: 0.213
+Event 376: 0.213
+Event 375: 0.213
+Event 374: 0.212
+Event 373: 0.212
+
+Dead-end events (no consequences): 37
+
+Causal loops found: 15875
+Notable causal loops:
+Loop 1: 479
+Loop 2: 232.0 -> 231.0
+Loop 3: 513.0 -> 391.0 -> 189.0 -> 396.0 -> 492.0 -> 493.0 -> 495.0 -> 502.0 -> 503.0 -> 504.0 -> 506.0 -> 509.0 -> 438.0 -> 452.0 -> 514.0
+
+Strongly connected event groups: 248
+Largest group size: 286
