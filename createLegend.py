@@ -10,13 +10,13 @@ def create_legend_image(width=600, filename="legend.png", upscale_factor=4):
 
     # --- Colors ---
     colors = {
-        "background": "#ffffff", #rgba(255, 255, 255, 0.08)
+        "background": "#1a1a2e",
         "text_primary": "#ffffff",
         "text_secondary": "#b8b8d1",
         "jonas_world": "#00d9ff",
         "martha_world": "#ff3cac",
         "other_character": "#c92eff",
-        "starting_event": "#ffac33",
+        "starting_event": "#69e8a8",
         "death_border": "#c92eff",
         "time_travel_border": "#3498db",
         "important_event_border": "#ffd700",
