@@ -44,8 +44,13 @@ const Visualization = (() => {
         // Set up event handlers
         setupEventHandlers();
         
-        // Render visualization
+        // Render visualization first
         render();
+        
+        // Initialize image manager after first render
+        if (typeof ImageManager !== 'undefined') {
+            ImageManager.initialize(svg, zoomGroup);
+        }
     };
     
     /**
@@ -98,6 +103,11 @@ const Visualization = (() => {
         renderEdges(); // Render edges first (regular edges go above time travel edges but below boxes)
         renderNodes();
         renderCharacterImages(); // Add character images
+        
+        // Render custom uploaded images on top of everything
+        if (typeof ImageManager !== 'undefined' && ImageManager.renderImages) {
+            ImageManager.renderImages();
+        }
         
         // Render the static legend image, which is not part of the zoom group
         renderLegendImage();
@@ -1188,7 +1198,8 @@ const wrap = (text, width) => {
     function saveLayoutJson() {
         const dataToSave = {
             nodePositions: layout.nodePositions,
-            edgeControls: customEdgeControls
+            edgeControls: customEdgeControls,
+            images: typeof ImageManager !== 'undefined' ? ImageManager.getImagesForExport() : []
         };
         const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1231,6 +1242,15 @@ const wrap = (text, width) => {
                     // Apply loaded edge controls
                     if (json.edgeControls) {
                         customEdgeControls = json.edgeControls;
+                    }
+                    // Apply loaded images
+                    if (json.images && typeof ImageManager !== 'undefined') {
+                        localStorage.setItem('dark-graph-images', JSON.stringify(json.images));
+                        ImageManager.clearImages(); // Clear current images
+                        // The ImageManager will reload from localStorage on next render
+                        setTimeout(() => {
+                            ImageManager.reloadImages();
+                        }, 100);
                     }
                     saveNodePositions();
                     saveEdgeControls();
@@ -1318,8 +1338,6 @@ const savePng = () => {
     const LEGEND_ORIGIN_SCALE = 1.0; // Uniform scale for right legend
     const LEGEND_ORIGIN_OFFSET_X = 8200; // Horizontal offset for right legend
     const LEGEND_ORIGIN_OFFSET_Y = 0; // Vertical offset for right legend
-
-
 
     const svgElement = document.querySelector('#graph');
     // --- Reset zoom/pan for export ---
@@ -1449,14 +1467,69 @@ const savePng = () => {
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.drawImage(originLegendImg, originX, originY, originW, originH);
                     ctx.restore();
-                    canvas.toBlob((blob) => {
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = 'dark-graph-12288x1200.png';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }, 'image/png');
+                    
+                    // === Add uploaded images on top of everything ===
+                    if (typeof ImageManager !== 'undefined') {
+                        const uploadedImages = ImageManager.getImagesForExport();
+                        if (uploadedImages.length > 0) {
+                            // Apply the same transform as the graph (scale 3.0, translate 2000, 350)
+                            const graphScale = 3.0;
+                            const graphOffsetX = 2000;
+                            const graphOffsetY = 350;
+                            
+                            uploadedImages.forEach(imageData => {
+                                const customImg = new window.Image();
+                                customImg.onload = () => {
+                                    // Calculate scaled dimensions
+                                    const scaledWidth = imageData.originalWidth * imageData.scale * graphScale;
+                                    const scaledHeight = imageData.originalHeight * imageData.scale * graphScale;
+                                    
+                                    // Calculate position with graph transform applied
+                                    const scaledX = imageData.x * graphScale + graphOffsetX - scaledWidth / 2;
+                                    const scaledY = imageData.y * graphScale + graphOffsetY - scaledHeight / 2;
+                                    
+                                    ctx.save();
+                                    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to default for custom images
+                                    ctx.drawImage(customImg, scaledX, scaledY, scaledWidth, scaledHeight);
+                                    ctx.restore();
+                                    
+                                    // Check if this is the last image to save the final PNG
+                                    const isLastImage = uploadedImages.indexOf(imageData) === uploadedImages.length - 1;
+                                    if (isLastImage) {
+                                        canvas.toBlob((blob) => {
+                                            const link = document.createElement('a');
+                                            link.href = URL.createObjectURL(blob);
+                                            link.download = 'dark-graph-12288x1200.png';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }, 'image/png');
+                                    }
+                                };
+                                customImg.src = imageData.dataUrl;
+                            });
+                        } else {
+                            // No uploaded images, save immediately
+                            canvas.toBlob((blob) => {
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = 'dark-graph-12288x1200.png';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }, 'image/png');
+                        }
+                    } else {
+                        // ImageManager not available, save immediately
+                        canvas.toBlob((blob) => {
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = 'dark-graph-12288x1200.png';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }, 'image/png');
+                    }
                 };
                 originLegendImg.src = 'images/origin_graph.png';
             };

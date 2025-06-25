@@ -25,6 +25,31 @@
                     <button onclick="saveSvg()">Download SVG</button>
                     <button onclick="savePng(window.layout, window.LayoutLogic)">Save PNG</button>
                 </div>
+                <div class="image-controls">
+                    <button id="upload-image-btn" class="upload-btn">📷 Upload Image</button>
+                    <button id="clear-images-btn" class="clear-btn">🗑️ Clear All Images</button>
+                    <div class="position-controls">
+                        <div class="position-row">
+                            <button id="move-up-btn" class="arrow-btn">⬆️</button>
+                        </div>
+                        <div class="position-row">
+                            <button id="move-left-btn" class="arrow-btn">⬅️</button>
+                            <button id="move-right-btn" class="arrow-btn">➡️</button>
+                        </div>
+                        <div class="position-row">
+                            <button id="move-down-btn" class="arrow-btn">⬇️</button>
+                        </div>
+                    </div>
+                    <div class="offset-controls">
+                        <label for="position-offset">Position Offset:</label>
+                        <input type="number" id="position-offset" value="10" min="1" max="100" step="1">
+                    </div>
+                    <input type="file" id="image-upload" accept="image/*" multiple style="display: none;">
+                    <div id="image-list" class="image-list"></div>
+                    <div class="image-instructions">
+                        <small>💡 Use arrow buttons to move selected image • Adjust offset for movement amount</small>
+                    </div>
+                </div>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-symbol regular-event"></div>
@@ -87,6 +112,7 @@
     <script src="js/data_parser.js?v=20250519"></script>
     <script src="js/layout_logic.js?v=20250519"></script>
     <script src="js/legend.js?v=20250519"></script>
+    <script src="js/image_manager.js?v=20250519"></script>
     <script src="js/visualisation.js?v=20250519"></script>
     <script src="js/main.js?v=20250519"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/canvg/3.0.7/umd.min.js"></script>
