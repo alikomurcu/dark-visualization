@@ -728,8 +728,7 @@ const Visualization = (() => {
             .attr('y', nodeHeight / 2)
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'middle')
-            .style('fill', '#000000') // Black text
-            .text(d => {
+                        .text(d => {
                 // Truncate description if it's too long
                 const maxLength = 80;
                 let text = d.description || '';
