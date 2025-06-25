@@ -1305,70 +1305,78 @@ const saveSvg = () => {
 const savePng = () => {
     const svgElement = document.querySelector('#graph');
     const clonedSvg = svgElement.cloneNode(true);
-    
-    // Set proper dimensions and viewBox
-    clonedSvg.setAttribute('width', '12288');
-    clonedSvg.setAttribute('height', '1200');
-    clonedSvg.setAttribute('viewBox', '0 0 12288 1200');
+
+    // Force exact canvas resolution and scaling
+    const WIDTH = 12288;
+    const HEIGHT = 1200;
+
+    clonedSvg.setAttribute('width', WIDTH);
+    clonedSvg.setAttribute('height', HEIGHT);
+    clonedSvg.setAttribute('viewBox', `0 0 ${WIDTH} ${HEIGHT}`);
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    
-    // Add background rect
-    const backgroundRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    backgroundRect.setAttribute('width', '100%');
-    backgroundRect.setAttribute('height', '100%');
-    backgroundRect.setAttribute('fill', '#121212');
-    clonedSvg.insertBefore(backgroundRect, clonedSvg.firstChild);
 
-    // Include all styles
-    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleElement.textContent = `
-        .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #aaaaaa; stroke-width: 2px; }
-        .temporal-box-label { fill: #f5f5f5; font-size: 14px; text-anchor: middle; }
-        .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #aaaaaa; stroke-width: 0.5px; stroke-dasharray: 2,2; }
-        .swimlane-label { fill: #aaaaaa; font-size: 12px; text-anchor: start; }
-        .node { stroke: #121212; stroke-width: 1.5px; }
-        .node.jonas { fill: #3498db; }
-        .node.martha { fill: #e74c3c; }
-        .node.other { fill: #2ecc71; }
-        .node.important { fill: #ffd700; }
-        .node.death { stroke: #8e44ad; stroke-width: 2px; }
-        .edge { stroke: rgba(255, 255, 255, 0.7); stroke-width: 1.5px; fill: none; opacity: 0.8; }
-        .summarized-edge { stroke: rgba(255, 255, 255, 0.6); stroke-width: 1.5px; stroke-dasharray: 4,3; fill: none; opacity: 0.7; }
-        .transition-path { fill-opacity: 0.3; stroke: none; }
-        .transition-path.jonas { fill: #3498db; }
-        .transition-path.martha { fill: #e74c3c; }
-        .transition-path.other { fill: #2ecc71; }
+    // Add full background (matches browser)
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('width', WIDTH);
+    bgRect.setAttribute('height', HEIGHT);
+    bgRect.setAttribute('fill', '#121212');
+    clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+
+    // Manually insert the legend image on the very left
+    const legendImg = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    legendImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', 'images/legend/legend.png');
+    legendImg.setAttribute('x', '0');
+    legendImg.setAttribute('y', HEIGHT / 2 - 300);  // center vertically assuming height ~600px
+    legendImg.setAttribute('width', '300');
+    legendImg.setAttribute('height', '600');
+    clonedSvg.insertBefore(legendImg, clonedSvg.firstChild.nextSibling);
+
+    // Inline styles for temporal boxes, nodes, edges, etc. from style.css
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+        .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #b8b8d1; stroke-width: 2px; }
+        .temporal-box-label { fill: #ffffff; font-size: 14px; text-anchor: middle; }
+        .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #b8b8d1; stroke-width: 0.5px; stroke-dasharray: 2,2; }
+        .swimlane-label { fill: #b8b8d1; font-size: 12px; text-anchor: start; }
+        .node.jonas { fill: #00d9ff; }
+        .node.martha { fill: #ff3cac; }
+        .node.origin { fill: #9b59b6; }
+        .node.other { fill: #0f0f1c; }
+        .node-text { font-size: 10px; font-weight: 600; fill: #f0f0f0; pointer-events: none; }
+        .edge { stroke: rgba(238, 242, 245, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
+        .summarized-edge { stroke: rgba(240, 240, 240, 0.75); stroke-width: 1.6px; stroke-dasharray: 4,3; fill: none; opacity: 0.85; }
+        .time-travel-past-edge { stroke: rgba(100, 181, 246, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
+        .time-travel-future-edge { stroke: rgba(255, 152, 0, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
+        .transition-path.jonas { fill: #00d9ff; fill-opacity: 0.3; }
+        .transition-path.martha { fill: #ff3cac; fill-opacity: 0.3; }
+        .transition-path.other { fill: #0f0f1c; fill-opacity: 0.3; }
     `;
-    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+    clonedSvg.insertBefore(styleEl, clonedSvg.firstChild);
 
-    const svgData = new XMLSerializer().serializeToString(clonedSvg);
-    
-    // Create canvas with the correct dimensions
-    const canvas = document.createElement('canvas');
-    canvas.width = 12288;
-    canvas.height = 1200;
-    const ctx = canvas.getContext('2d');
-
-    // Set background
-    ctx.fillStyle = '#121212';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Create an image from the SVG
+    const svgString = new XMLSerializer().serializeToString(clonedSvg);
     const img = new Image();
-    img.onload = () => {
-        // Draw the image on canvas
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Convert to PNG and download
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = WIDTH;
+        canvas.height = HEIGHT;
+        const ctx = canvas.getContext('2d');
+
+        // Fill background to ensure no transparency
+        ctx.fillStyle = '#121212';
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+
         canvas.toBlob((blob) => {
-            const downloadLink = document.createElement('a');
-            downloadLink.href = URL.createObjectURL(blob);
-            downloadLink.download = 'dark-visualization.png';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-        }, 'image/png', 1.0);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'dark-graph-12288x1200.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }, 'image/png');
     };
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
 };
 
