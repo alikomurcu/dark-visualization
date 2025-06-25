@@ -1306,8 +1306,37 @@ const saveSvg = () => {
 };
 
 const savePng = () => {
+    // === Graph transform controls ===
+    const GRAPH_OFFSET_X = 1200;
+    const GRAPH_OFFSET_Y = 150;
+    const GRAPH_SCALE = 0.8;
+
+
+        // === Legend transform controls ===
+    // Left legend
+    const LEGEND_LEFT_SCALE = 1.0; // Uniform scale for left legend
+    const LEGEND_LEFT_OFFSET_X = 300; // Horizontal offset for left legend
+    const LEGEND_LEFT_OFFSET_Y = 0; // Vertical offset for left legend
+    // Right legend
+    const LEGEND_RIGHT_SCALE = 1.0; // Uniform scale for right legend
+    const LEGEND_RIGHT_OFFSET_X = -500; // Horizontal offset for right legend
+    const LEGEND_RIGHT_OFFSET_Y = 0; // Vertical offset for right legend
+
     const svgElement = document.querySelector('#graph');
+    // --- Reset zoom/pan for export ---
+    const zoomGroup = svgElement.querySelector('g.zoom-group');
+    let originalTransform = null;
+    if (zoomGroup) {
+        originalTransform = zoomGroup.getAttribute('transform');
+        zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.8)');
+    }
+
     const clonedSvg = svgElement.cloneNode(true);
+
+    // Restore the original transform in the DOM (browser view)
+    if (zoomGroup && originalTransform !== null) {
+        zoomGroup.setAttribute('transform', originalTransform);
+    }
 
     const WIDTH = 12288;
     const HEIGHT = 1200;
@@ -1336,7 +1365,8 @@ const savePng = () => {
         .node.jonas { fill: #00d9ff; }
         .node.martha { fill: #ff3cac; }
         .node.origin { fill: #9b59b6; }
-        .node.other { fill: #0f0f1c; }
+        .node.start { fill: #ffac33;}
+        .node.other { fill:rgb(27, 28, 15); }
         .node-text { font-size: 10px; font-weight: 600; fill: #f0f0f0; pointer-events: none; }
         .edge { stroke: rgba(238, 242, 245, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
         .summarized-edge { stroke: rgba(240, 240, 240, 0.75); stroke-width: 1.6px; stroke-dasharray: 4,3; fill: none; opacity: 0.85; }
@@ -1356,30 +1386,39 @@ const savePng = () => {
         canvas.width = WIDTH;
         canvas.height = HEIGHT;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#121212';
+        ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // === Apply graph transform (offsets and scale) ===
+        ctx.save();
+        // ctx.setTransform(GRAPH_SCALE, 0, 0, GRAPH_SCALE, GRAPH_OFFSET_X, GRAPH_OFFSET_Y);
         ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+        ctx.restore();
 
         // Overlay the left legend image, preserving aspect ratio and centering vertically
         const legendImg = new window.Image();
         legendImg.onload = () => {
-            // Calculate scale for left legend
-            const leftScale = Math.min(LEGEND_WIDTH / LEFT_ORIG_W, HEIGHT / LEFT_ORIG_H);
+            const leftScale = Math.min(LEGEND_WIDTH / LEFT_ORIG_W, HEIGHT / LEFT_ORIG_H) * LEGEND_LEFT_SCALE;
             const leftW = LEFT_ORIG_W * leftScale;
             const leftH = LEFT_ORIG_H * leftScale;
-            const leftX = 0;
-            const leftY = (HEIGHT - leftH) / 2 + 20; // Center vertically
+            const leftX = 0 + LEGEND_LEFT_OFFSET_X;
+            const leftY = (HEIGHT - leftH) / 2 + 20 + LEGEND_LEFT_OFFSET_Y; // Center vertically + offset
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to default for legend
             ctx.drawImage(legendImg, leftX, leftY, leftW, leftH);
+            ctx.restore();
             // Overlay the right legend image after the left is loaded
             const textLegendImg = new window.Image();
             textLegendImg.onload = () => {
-                // Calculate scale for right legend
-                const rightScale = Math.min(LEGEND_WIDTH / RIGHT_ORIG_W, HEIGHT / RIGHT_ORIG_H);
+                const rightScale = Math.min(LEGEND_WIDTH / RIGHT_ORIG_W, HEIGHT / RIGHT_ORIG_H) * LEGEND_RIGHT_SCALE;
                 const rightW = RIGHT_ORIG_W * rightScale;
                 const rightH = RIGHT_ORIG_H * rightScale;
-                const rightX = WIDTH - rightW;
-                const rightY = (HEIGHT - rightH) / 2; // Center vertically
+                const rightX = WIDTH - rightW + LEGEND_RIGHT_OFFSET_X;
+                const rightY = (HEIGHT - rightH) / 2 + LEGEND_RIGHT_OFFSET_Y; // Center vertically + offset
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to default for legend
                 ctx.drawImage(textLegendImg, rightX, rightY, rightW, rightH);
+                ctx.restore();
                 canvas.toBlob((blob) => {
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
