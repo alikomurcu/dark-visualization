@@ -1375,7 +1375,7 @@ const savePng = () => {
         .node.jonas { fill: #00d9ff; }
         .node.martha { fill: #ff3cac; }
         .node.origin { fill: #9b59b6; }
-        .node.start { fill: #ffac33;}
+        .node.start { fill: #69e8a8;}
         .node.other { fill:rgb(27, 28, 15); }
         .node-text { font-size: 10px; font-weight: 600; fill: #f0f0f0; pointer-events: none; }
         .edge { stroke: rgba(238, 242, 245, 0.9); stroke-width: 4px; fill: none; opacity: 0.9; }
