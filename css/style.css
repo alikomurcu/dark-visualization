@@ -343,15 +343,12 @@ h1 {
 }
 
 /* Node text styles */
-.node-text {
-    font-size: 10px;
-    font-weight: 600;
-    fill: #f0f0f0; /* off-white for less harshness but good contrast */
-    pointer-events: none;
-}
-
+.node-text,
 .node-text tspan {
-    font-size: 10px;
+    font-size: 16px; /* Control node text size here */
+    font-weight: 600;
+    fill: #000000; /* Black text for better contrast on light nodes */
+    pointer-events: none;
 }
 
 /* Edges */
