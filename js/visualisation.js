@@ -37,6 +37,9 @@ const Visualization = (() => {
         
         // Calculate layout
         layout = LayoutLogic.calculateLayout(data);
+        // Expose layout and LayoutLogic globally for savePng
+        window.layout = layout;
+        window.LayoutLogic = LayoutLogic;
         
         // Set up event handlers
         setupEventHandlers();
@@ -1306,32 +1309,24 @@ const savePng = () => {
     const svgElement = document.querySelector('#graph');
     const clonedSvg = svgElement.cloneNode(true);
 
-    // Force exact canvas resolution and scaling
     const WIDTH = 12288;
     const HEIGHT = 1200;
+    const LEGEND_WIDTH = 1800;
+    // Original legend.png: 600x1250, textLegend.png: 800x634
+    const LEFT_ORIG_W = 600, LEFT_ORIG_H = 1250;
+    const RIGHT_ORIG_W = 800, RIGHT_ORIG_H = 634;
 
     clonedSvg.setAttribute('width', WIDTH);
     clonedSvg.setAttribute('height', HEIGHT);
     clonedSvg.setAttribute('viewBox', `0 0 ${WIDTH} ${HEIGHT}`);
     clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
-    // Add full background (matches browser)
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('width', WIDTH);
     bgRect.setAttribute('height', HEIGHT);
     bgRect.setAttribute('fill', '#121212');
     clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
 
-    // Manually insert the legend image on the very left
-    const legendImg = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-    legendImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', 'images/legend/legend.png');
-    legendImg.setAttribute('x', '0');
-    legendImg.setAttribute('y', HEIGHT / 2 - 300);  // center vertically assuming height ~600px
-    legendImg.setAttribute('width', '300');
-    legendImg.setAttribute('height', '600');
-    clonedSvg.insertBefore(legendImg, clonedSvg.firstChild.nextSibling);
-
-    // Inline styles for temporal boxes, nodes, edges, etc. from style.css
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleEl.textContent = `
         .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #b8b8d1; stroke-width: 2px; }
@@ -1353,30 +1348,51 @@ const savePng = () => {
     `;
     clonedSvg.insertBefore(styleEl, clonedSvg.firstChild);
 
+    // Convert SVG to PNG, then overlay the legend images on the left and right
     const svgString = new XMLSerializer().serializeToString(clonedSvg);
     const img = new Image();
-
     img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = WIDTH;
         canvas.height = HEIGHT;
         const ctx = canvas.getContext('2d');
-
-        // Fill background to ensure no transparency
         ctx.fillStyle = '#121212';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
 
-        canvas.toBlob((blob) => {
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'dark-graph-12288x1200.png';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }, 'image/png');
+        // Overlay the left legend image, preserving aspect ratio and centering vertically
+        const legendImg = new window.Image();
+        legendImg.onload = () => {
+            // Calculate scale for left legend
+            const leftScale = Math.min(LEGEND_WIDTH / LEFT_ORIG_W, HEIGHT / LEFT_ORIG_H);
+            const leftW = LEFT_ORIG_W * leftScale;
+            const leftH = LEFT_ORIG_H * leftScale;
+            const leftX = 0;
+            const leftY = (HEIGHT - leftH) / 2 + 20; // Center vertically
+            ctx.drawImage(legendImg, leftX, leftY, leftW, leftH);
+            // Overlay the right legend image after the left is loaded
+            const textLegendImg = new window.Image();
+            textLegendImg.onload = () => {
+                // Calculate scale for right legend
+                const rightScale = Math.min(LEGEND_WIDTH / RIGHT_ORIG_W, HEIGHT / RIGHT_ORIG_H);
+                const rightW = RIGHT_ORIG_W * rightScale;
+                const rightH = RIGHT_ORIG_H * rightScale;
+                const rightX = WIDTH - rightW;
+                const rightY = (HEIGHT - rightH) / 2; // Center vertically
+                ctx.drawImage(textLegendImg, rightX, rightY, rightW, rightH);
+                canvas.toBlob((blob) => {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'dark-graph-12288x1200.png';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }, 'image/png');
+            };
+            textLegendImg.src = 'images/legend/textLegend.png';
+        };
+        legendImg.src = 'images/legend/legend.png';
     };
-
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
 };
 

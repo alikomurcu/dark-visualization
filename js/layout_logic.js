@@ -12,8 +12,9 @@ const LayoutLogic = (() => {
 
 
     // Constants for layout dimensions
-    const LEGEND_WIDTH = 650; // Space for the legend image (600px width + 50px padding)
-    const MARGIN = { top: FIXED_HEIGHT*0.08, right: FIXED_WIDTH*0.03, bottom: FIXED_HEIGHT*0.08, left: FIXED_WIDTH*0.03 };
+    const LEGEND_WIDTH = 300; // Legend width in px (should match legend.js)
+    const LEGEND_PADDING = 50; // Padding between legend and boxes
+    const MARGIN = { top: 20, right: FIXED_WIDTH*0.03, bottom: 20, left: LEGEND_WIDTH + LEGEND_PADDING };
     const BOX_SPACING = FIXED_WIDTH*0.025; // Increased spacing between temporal boxes
     const BOX_MIN_WIDTH = FIXED_WIDTH*0.028; // Much wider minimum box width to utilize full graph width
     const BOX_MAX_WIDTH = FIXED_WIDTH*0.18; // Much wider maximum box width
@@ -660,3 +661,7 @@ const LayoutLogic = (() => {
         resetZoom
     };
 })();
+
+// Export legend width for use in other modules
+LayoutLogic.LEGEND_WIDTH = LEGEND_WIDTH;
+LayoutLogic.LEGEND_PADDING = LEGEND_PADDING;
