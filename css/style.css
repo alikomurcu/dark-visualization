@@ -302,8 +302,8 @@ h1 {
 }
 
 .temporal-box-label {
-    fill: var(--text-primary);
-    font-size: 14px;
+    fill: #f5f5f5;
+    font-size: 40px;
     text-anchor: middle;
 }
 

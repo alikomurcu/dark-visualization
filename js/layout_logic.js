@@ -651,6 +651,19 @@ const LayoutLogic = (() => {
         );
     };
     
+    /**
+     * Programmatically set the zoom/pan transform for the graph.
+     * @param {Object} transform - A d3.zoomIdentity or similar object with x, y, k (scale)
+     */
+    const setTransform = (transform) => {
+        if (!svg) return;
+        svg.select('g.zoom-group').attr('transform', `translate(${transform.x},${transform.y}) scale(${transform.k})`);
+        // Optionally update the zoom state:
+        if (zoom) {
+            svg.call(zoom.transform, d3.zoomIdentity.translate(transform.x, transform.y).scale(transform.k));
+        }
+    };
+    
     // Public API
     return {
         initialize,
@@ -658,7 +671,8 @@ const LayoutLogic = (() => {
         calculateLayout,
         generateTransitionPath,
         generateEdgePath,
-        resetZoom
+        resetZoom,
+        setTransform
     };
 })();
 

@@ -1273,7 +1273,7 @@ const saveSvg = () => {
     const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleElement.textContent = `
         .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #aaaaaa; stroke-width: 2px; }
-        .temporal-box-label { fill: #f5f5f5; font-size: 14px; text-anchor: middle; }
+        .temporal-box-label { fill: #f5f5f5; font-size: 30px; text-anchor: middle; }
         .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #aaaaaa; stroke-width: 0.5px; stroke-dasharray: 2,2; }
         .swimlane-label { fill: #aaaaaa; font-size: 12px; text-anchor: start; }
         .node { stroke: #121212; stroke-width: 1.5px; }
@@ -1306,13 +1306,7 @@ const saveSvg = () => {
 };
 
 const savePng = () => {
-    // === Graph transform controls ===
-    const GRAPH_OFFSET_X = 1200;
-    const GRAPH_OFFSET_Y = 150;
-    const GRAPH_SCALE = 0.8;
-
-
-        // === Legend transform controls ===
+    // === Legend transform controls ===
     // Left legend
     const LEGEND_LEFT_SCALE = 1.0; // Uniform scale for left legend
     const LEGEND_LEFT_OFFSET_X = 300; // Horizontal offset for left legend
@@ -1328,14 +1322,30 @@ const savePng = () => {
     let originalTransform = null;
     if (zoomGroup) {
         originalTransform = zoomGroup.getAttribute('transform');
-        zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.85)');
+        // Use the new setTransform logic
+        if (window.LayoutLogic && typeof window.LayoutLogic.setTransform === 'function') {
+            window.LayoutLogic.setTransform({ x: 1000, y: 100, k: 0.85 });
+        } else {
+            zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.85)');
+        }
     }
 
     const clonedSvg = svgElement.cloneNode(true);
 
     // Restore the original transform in the DOM (browser view)
     if (zoomGroup && originalTransform !== null) {
-        zoomGroup.setAttribute('transform', originalTransform);
+        if (window.LayoutLogic && typeof window.LayoutLogic.setTransform === 'function') {
+            // Parse the original transform string to extract x, y, k
+            const match = /translate\(([^,]+),([^\)]+)\) scale\(([^\)]+)\)/.exec(originalTransform);
+            if (match) {
+                const [, x, y, k] = match;
+                window.LayoutLogic.setTransform({ x: parseFloat(x), y: parseFloat(y), k: parseFloat(k) });
+            } else {
+                zoomGroup.setAttribute('transform', originalTransform);
+            }
+        } else {
+            zoomGroup.setAttribute('transform', originalTransform);
+        }
     }
 
     const WIDTH = 12288;
@@ -1359,7 +1369,7 @@ const savePng = () => {
     const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleEl.textContent = `
         .temporal-box { fill: rgba(255, 255, 255, 0.08); stroke: #b8b8d1; stroke-width: 2px; }
-        .temporal-box-label { fill: #ffffff; font-size: 14px; text-anchor: middle; }
+        .temporal-box-label { fill: #ffffff; font-size: 40px; text-anchor: middle; }
         .swimlane { fill: rgba(255, 255, 255, 0.02); stroke: #b8b8d1; stroke-width: 0.5px; stroke-dasharray: 2,2; }
         .swimlane-label { fill: #b8b8d1; font-size: 12px; text-anchor: start; }
         .node.jonas { fill: #00d9ff; }
