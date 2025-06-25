@@ -1328,7 +1328,7 @@ const savePng = () => {
     let originalTransform = null;
     if (zoomGroup) {
         originalTransform = zoomGroup.getAttribute('transform');
-        zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.8)');
+        zoomGroup.setAttribute('transform', 'translate(1000,100) scale(0.85)');
     }
 
     const clonedSvg = svgElement.cloneNode(true);
