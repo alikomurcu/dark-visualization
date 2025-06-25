@@ -513,15 +513,8 @@ const Visualization = (() => {
             let edgeColor = 'white';
             if (isTimeTravelEdge) {
                 edgeColor = timeTravelDirection === 'future' ? '#ff9800' : '#64b5f6';
-            } else if (sourcePos.timeRange === targetPos.timeRange && sourcePos.lane === targetPos.lane) {
-                if (sourcePos.lane === 'jonas') edgeColor = 'blue';
-                else if (sourcePos.lane === 'martha') edgeColor = 'green';
-                else if (sourcePos.lane === 'other') edgeColor = 'yellow';
-            } else if (sourcePos.timeRange === targetPos.timeRange) {
-                if (sourcePos.lane === 'jonas') edgeColor = 'blue';
-                else if (sourcePos.lane === 'martha') edgeColor = 'green';
-                else if (sourcePos.lane === 'other') edgeColor = 'yellow';
             } // else keep white for bundled/complex
+            
             // Use custom control points if present
             let pathData = '';
             if (customEdgeControls[edgeKey] && customEdgeControls[edgeKey].length > 0) {
