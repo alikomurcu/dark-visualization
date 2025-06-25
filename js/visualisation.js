@@ -1312,8 +1312,14 @@ const savePng = () => {
     const LEGEND_LEFT_OFFSET_Y = 0; // Vertical offset for left legend
     // Right legend
     const LEGEND_RIGHT_SCALE = 1.0; // Uniform scale for right legend
-    const LEGEND_RIGHT_OFFSET_X = -500; // Horizontal offset for right legend
+    const LEGEND_RIGHT_OFFSET_X = -600; // Horizontal offset for right legend
     const LEGEND_RIGHT_OFFSET_Y = 0; // Vertical offset for right legend
+    // Origin world legend
+    const LEGEND_ORIGIN_SCALE = 1.0; // Uniform scale for right legend
+    const LEGEND_ORIGIN_OFFSET_X = 8200; // Horizontal offset for right legend
+    const LEGEND_ORIGIN_OFFSET_Y = 0; // Vertical offset for right legend
+
+
 
     const svgElement = document.querySelector('#graph');
     // --- Reset zoom/pan for export ---
@@ -1353,6 +1359,7 @@ const savePng = () => {
     // Original legend.png: 600x1250, textLegend.png: 800x634
     const LEFT_ORIG_W = 600, LEFT_ORIG_H = 1250;
     const RIGHT_ORIG_W = 800, RIGHT_ORIG_H = 634;
+    const ORIGIN_W = 800, ORIGIN_H = 2000;
 
     clonedSvg.setAttribute('width', WIDTH);
     clonedSvg.setAttribute('height', HEIGHT);
@@ -1428,14 +1435,30 @@ const savePng = () => {
                 ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to default for legend
                 ctx.drawImage(textLegendImg, rightX, rightY, rightW, rightH);
                 ctx.restore();
-                canvas.toBlob((blob) => {
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = 'dark-graph-12288x1200.png';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }, 'image/png');
+                // === Add the origin_graph legend between left and right legends ===
+                const originLegendImg = new window.Image();
+                originLegendImg.onload = () => {
+                    // Use ORIGIN_W and ORIGIN_H for scaling
+                    const originScale = Math.min(LEGEND_WIDTH / ORIGIN_W, HEIGHT / ORIGIN_H) * LEGEND_ORIGIN_SCALE;
+                    const originW = ORIGIN_W * originScale;
+                    const originH = ORIGIN_H * originScale;
+                    // Place it using freely controllable offset
+                    const originX = WIDTH - LEGEND_ORIGIN_OFFSET_X;
+                    const originY = (HEIGHT - originH) / 2 + LEGEND_ORIGIN_OFFSET_Y;
+                    ctx.save();
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.drawImage(originLegendImg, originX, originY, originW, originH);
+                    ctx.restore();
+                    canvas.toBlob((blob) => {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = 'dark-graph-12288x1200.png';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }, 'image/png');
+                };
+                originLegendImg.src = 'images/origin_graph.png';
             };
             textLegendImg.src = 'images/legend/textLegend.png';
         };
