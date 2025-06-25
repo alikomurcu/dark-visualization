@@ -579,7 +579,11 @@ const Visualization = (() => {
                     'url(#arrow)')
                 .style('stroke', edgeColor)
                 .style('stroke-width', isTimeTravelEdge ? 4 : 2)
-                .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
+                .style('filter',
+                    isTimeTravelEdge || edgeColor === '#f7fcff' || edgeColor === 'white'
+                        ? 'url(#glow-effect)'
+                        : null
+                )
                 .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
                 .style('stroke-linecap', 'round')
                 .style('stroke-linejoin', 'round')
@@ -1039,7 +1043,11 @@ const wrap = (text, width) => {
                     'url(#arrow)')
                 .style('stroke', edgeColor) 
                 .style('stroke-width', isTimeTravelEdge ? 4 : strokeWidth) // Wider stroke for time travel
-                .style('filter', isTimeTravelEdge ? 'url(#glow-effect)' : null)
+                .style('filter',
+                    isTimeTravelEdge || edgeColor === '#f7fcff' || edgeColor === 'white'
+                        ? 'url(#glow-effect)'
+                        : null
+                )
                 .style('stroke-opacity', isTimeTravelEdge ? 0.9 : 1)
                 .style('stroke-linecap', 'round')
                 .style('stroke-linejoin', 'round')

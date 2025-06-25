@@ -356,17 +356,17 @@ h1 {
 
 /* Edges */
 .edge {
-    stroke: rgba(240, 240, 240, 0.85); /* brighter and more opaque */
-    stroke-width: 1.6px;
     fill: none;
+    stroke: rgba(238, 242, 245, 0.9); /* Light blue (#64b5f6) */
+    stroke-width: 4px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
     opacity: 0.9;
-    transition: opacity 0.3s ease, stroke-width 0.3s ease;
 }
 
 .edge:hover {
     opacity: 1;
-    stroke: #ffffff; /* pure white on hover for max contrast */
-    stroke-width: 2.4px;
+    stroke-width: 5px;
 }
 
 .edge-marker {
